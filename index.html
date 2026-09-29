@@ -1,0 +1,604 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no" />
+<title>Bike Workshop — Bullit</title>
+<link rel="manifest" href="manifest.webmanifest" />
+<meta name="theme-color" content="#08090a" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Bike Workshop" />
+<link rel="apple-touch-icon" href="icon-180.png" />
+<style>
+  :root{
+    --bg:#08090a;
+    --panel:#17191c;
+    --panel2:#202328;
+    --panel3:#111316;
+    --text:#f7f7f8;
+    --muted:#9ca0a7;
+    --faint:#656a72;
+    --accent:#ff4a3d;
+    --accent2:#ff756b;
+    --good:#39c776;
+    --warn:#ffb340;
+    --blue:#3aa4ff;
+    --line:#2a2e34;
+    --shadow:0 8px 24px rgba(0,0,0,.22);
+    --radius:18px;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","SF Pro Text",Inter,system-ui,sans-serif}
+  body{min-height:100vh;overflow-x:hidden}
+  button,input,textarea,select{font:inherit}
+  .app{max-width:460px;margin:0 auto;min-height:100vh;background:var(--bg);padding-bottom:96px}
+  .safe-top{height:max(12px,env(safe-area-inset-top))}
+  header{position:sticky;top:0;z-index:50;background:linear-gradient(180deg,#08090a 78%,rgba(8,9,10,.92));padding:8px 16px 10px;border-bottom:1px solid rgba(255,255,255,.035)}
+  .topline{display:flex;align-items:center;justify-content:space-between;gap:12px}
+  .brand{display:flex;align-items:center;gap:10px;min-width:0}
+  .bike-dot{width:38px;height:38px;border-radius:12px;background:linear-gradient(145deg,#4d1010,#e33a30);box-shadow:inset 0 0 0 1px rgba(255,255,255,.12);display:grid;place-items:center;font-weight:900}
+  .titlewrap{min-width:0}
+  .eyebrow{font-size:11px;color:var(--muted);font-weight:700;letter-spacing:.08em;text-transform:uppercase}
+  .title{font-size:20px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .iconbtn{width:38px;height:38px;border:0;border-radius:12px;background:var(--panel);color:var(--text);font-size:22px;display:grid;place-items:center}
+  .bike-tabs{display:flex;gap:8px;margin-top:12px;overflow:auto;scrollbar-width:none}
+  .bike-tabs::-webkit-scrollbar{display:none}
+  .bike-tab{flex:0 0 auto;border:1px solid var(--line);background:#111316;color:var(--muted);padding:8px 12px;border-radius:999px;font-size:13px;font-weight:750}
+  .bike-tab.active{background:rgba(255,74,61,.14);border-color:rgba(255,74,61,.5);color:#fff}
+  .bike-tab.disabled{opacity:.45}
+  main{padding:16px}
+  .screen{display:none;animation:fade .16s ease}
+  .screen.active{display:block}
+  @keyframes fade{from{opacity:.7;transform:translateY(3px)}to{opacity:1;transform:none}}
+  .hero{background:linear-gradient(150deg,#241719,#15171a 58%,#121417);border:1px solid rgba(255,74,61,.18);border-radius:24px;padding:18px;box-shadow:var(--shadow);position:relative;overflow:hidden}
+  .hero:after{content:"";position:absolute;right:-70px;top:-80px;width:180px;height:180px;border-radius:50%;background:radial-gradient(circle,rgba(255,74,61,.24),rgba(255,74,61,0) 66%)}
+  .hero .small{font-size:12px;color:#c4c5c8;font-weight:700}
+  .hero h1{font-size:28px;margin:4px 0 4px;letter-spacing:-.03em}
+  .hero p{font-size:13px;color:var(--muted);margin:0}
+  .quick-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
+  .current-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
+  .setup-summary{background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.06);border-radius:16px;padding:13px;min-width:0}
+  .setup-summary.wide{grid-column:1/-1}
+  .setup-summary-head{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
+  .setup-summary .label{font-size:11px;color:var(--muted);font-weight:800;text-transform:uppercase;letter-spacing:.06em}
+  .setup-summary .value{font-size:26px;font-weight:900;letter-spacing:-.03em;margin-top:4px}
+  .setup-summary .sub{font-size:11px;color:var(--muted);line-height:1.35;margin-top:3px}
+  .damping-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:12px;padding-top:10px;border-top:1px solid rgba(255,255,255,.07)}
+  .damping-item{display:flex;align-items:baseline;justify-content:space-between;gap:6px;font-size:11px;color:var(--muted)}
+  .damping-item strong{color:var(--text);font-size:13px;font-variant-numeric:tabular-nums}
+  .split-metrics{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:9px}
+  .split-metric{padding-right:8px}
+  .split-metric+.split-metric{border-left:1px solid rgba(255,255,255,.07);padding-left:12px;padding-right:0}
+  .setup-lines{display:grid;gap:8px;margin-top:10px}
+  .setup-line{display:flex;justify-content:space-between;gap:12px;font-size:11px;color:var(--muted)}
+  .setup-line strong{color:var(--text);font-size:12px;text-align:right}
+  .metric{background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.06);border-radius:15px;padding:12px;min-height:78px}
+  .metric .label{font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.06em}
+  .metric .value{font-size:23px;font-weight:850;margin-top:5px}
+  .metric .sub{font-size:11px;color:var(--muted);margin-top:2px}
+  .section-title{display:flex;align-items:end;justify-content:space-between;margin:22px 2px 10px}
+  .section-title h2{margin:0;font-size:22px;letter-spacing:-.02em}
+  .section-title button{background:none;border:0;color:var(--blue);font-size:13px;font-weight:750;padding:0}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .card{background:var(--panel);border:1px solid rgba(255,255,255,.05);border-radius:var(--radius);padding:15px;box-shadow:var(--shadow)}
+  .card h3{margin:0;font-size:15px}
+  .card .kicker{font-size:11px;color:var(--muted);font-weight:750;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px}
+  .big-number{font-size:33px;font-weight:900;letter-spacing:-.04em;line-height:1}
+  .unit{font-size:13px;color:var(--muted);font-weight:700;margin-left:4px}
+  .row{display:flex;align-items:center;justify-content:space-between;gap:12px}
+  .mini-list{display:grid;gap:9px;margin-top:12px}
+  .mini-line{display:flex;justify-content:space-between;font-size:12px;color:var(--muted)}
+  .mini-line strong{color:var(--text);font-size:12px}
+  .status-pill{display:inline-flex;align-items:center;gap:6px;padding:6px 9px;border-radius:999px;background:rgba(57,199,118,.12);color:#79e5a5;font-weight:750;font-size:11px}
+  .status-dot{width:7px;height:7px;background:var(--good);border-radius:50%}
+  .primary{width:100%;border:0;border-radius:15px;background:var(--accent);color:white;font-weight:850;padding:15px 16px;font-size:16px;box-shadow:0 8px 22px rgba(255,74,61,.25)}
+  .secondary{width:100%;border:1px solid var(--line);border-radius:15px;background:var(--panel);color:white;font-weight:800;padding:13px 16px;font-size:14px}
+  .action-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
+  .ride-card{background:var(--panel);border:1px solid rgba(255,255,255,.05);border-radius:16px;padding:14px;margin-bottom:10px}
+  .ride-card .date{font-weight:850;font-size:15px}
+  .ride-card .meta{color:var(--muted);font-size:12px;margin-top:3px}
+  .ride-card .chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+  .chip{background:#24272c;border:1px solid #2d3137;color:#d7d9dd;font-size:11px;font-weight:700;border-radius:999px;padding:6px 8px}
+  .ride-card .note{font-size:13px;color:#d6d7d9;line-height:1.35;margin-top:10px}
+  .seg{display:grid;grid-template-columns:repeat(2,1fr);background:#101215;border:1px solid var(--line);padding:3px;border-radius:12px;gap:3px}
+  .seg button{border:0;border-radius:9px;background:transparent;color:var(--muted);font-size:12px;font-weight:800;padding:8px}
+  .seg button.active{background:#2b2f34;color:white}
+  .setup-head{display:flex;justify-content:space-between;align-items:end;gap:10px;margin-bottom:12px}
+  .setup-head h2{margin:0;font-size:24px}
+  .setup-head p{margin:4px 0 0;color:var(--muted);font-size:12px}
+  .component-card{background:var(--panel);border:1px solid rgba(255,255,255,.05);border-radius:20px;overflow:hidden;margin-bottom:14px}
+  .component-header{padding:14px 15px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center}
+  .component-header .name{font-weight:900}
+  .component-header .desc{font-size:11px;color:var(--muted);margin-top:2px}
+  .compare-row{padding:13px 15px;border-bottom:1px solid rgba(255,255,255,.05)}
+  .compare-row:last-child{border-bottom:0}
+  .compare-top{display:grid;grid-template-columns:minmax(70px,1fr) 64px 64px 48px;gap:6px;align-items:center}
+  .compare-top .setting{font-weight:800;font-size:13px}
+  .compare-top .your,.compare-top .base,.compare-top .delta{font-size:12px;text-align:right;font-variant-numeric:tabular-nums}
+  .compare-top .your{font-weight:850;color:#fff}
+  .compare-top .base{color:#b9bcc2}
+  .compare-top .delta{font-weight:800}
+  .delta.good{color:#79e5a5}.delta.warn{color:#ffca72}.delta.neutral{color:#c7c9cd}
+  .compare-labels{display:grid;grid-template-columns:minmax(70px,1fr) 64px 64px 48px;gap:6px;color:var(--faint);font-size:9px;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px}
+  .compare-labels span:not(:first-child){text-align:right}
+  .barwrap{margin-top:9px;position:relative;height:12px;background:#0e1012;border-radius:999px;border:1px solid #2b2f34;overflow:visible}
+  .barfill{position:absolute;left:0;top:0;bottom:0;border-radius:999px;background:linear-gradient(90deg,#ff453a,#ff776f)}
+  .baseline{position:absolute;top:-4px;bottom:-4px;width:2px;background:#f3f3f3;border-radius:2px;opacity:.92}
+  .mine-dot{position:absolute;top:50%;width:10px;height:10px;margin-left:-5px;margin-top:-5px;border-radius:50%;background:#fff;box-shadow:0 0 0 3px rgba(255,74,61,.3)}
+  .row-note{font-size:11px;color:var(--muted);line-height:1.35;margin-top:8px}
+  .assessment{background:linear-gradient(180deg,#17191c,#141619);border-left:3px solid var(--accent);border-radius:14px;padding:13px 14px;margin:12px 15px 15px}
+  .assessment h4{margin:0 0 9px;font-size:13px;color:#ff8b84}
+  .assessment p{margin:6px 0;color:#cfd1d5;font-size:11px;line-height:1.45}
+  .assessment b{color:white}
+  .todo{display:flex;align-items:flex-start;gap:10px;padding:11px 0;border-bottom:1px solid var(--line)}
+  .todo:last-child{border-bottom:0}
+  .check{width:22px;height:22px;border:2px solid #4b5058;border-radius:7px;flex:none;margin-top:1px}
+  .todo .text{font-size:13px;font-weight:700}.todo .small{font-size:11px;color:var(--muted);margin-top:3px}
+  .spec-list{display:grid;gap:0}
+  .spec-row{display:flex;justify-content:space-between;gap:20px;padding:11px 0;border-bottom:1px solid var(--line);font-size:12px}
+  .spec-row:last-child{border:0}.spec-row span{color:var(--muted)}.spec-row strong{text-align:right}
+  nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:min(460px,100%);z-index:70;background:rgba(8,9,10,.96);backdrop-filter:blur(18px);border-top:1px solid #202328;padding:8px 7px max(8px,env(safe-area-inset-bottom));display:grid;grid-template-columns:repeat(5,1fr)}
+  nav button{border:0;background:none;color:#888d95;display:flex;flex-direction:column;align-items:center;gap:4px;font-size:10px;font-weight:700;padding:5px 0}
+  nav .ico{font-size:21px;line-height:1}
+  nav button.active{color:var(--accent2)}
+  .fab{position:fixed;right:max(18px,calc((100vw - 460px)/2 + 18px));bottom:92px;width:56px;height:56px;border-radius:50%;border:0;background:var(--accent);color:white;font-size:30px;box-shadow:0 10px 28px rgba(255,74,61,.36);z-index:60;display:grid;place-items:center}
+  .modal-back{display:none;position:fixed;inset:0;z-index:100;background:rgba(0,0,0,.62);backdrop-filter:blur(6px);align-items:flex-end;justify-content:center}
+  .modal-back.open{display:flex}
+  .sheet{width:min(460px,100%);max-height:90vh;overflow:auto;background:#111317;border-radius:24px 24px 0 0;border-top:1px solid #343840;padding:12px 16px calc(20px + env(safe-area-inset-bottom));box-shadow:0 -18px 50px rgba(0,0,0,.5)}
+  .grab{width:42px;height:5px;border-radius:999px;background:#454a52;margin:0 auto 14px}
+  .sheet h2{margin:0 0 3px;font-size:23px}.sheet .subhead{color:var(--muted);font-size:12px;margin-bottom:16px}
+  .field{margin-bottom:14px}.field label{display:block;font-size:11px;color:var(--muted);font-weight:800;text-transform:uppercase;letter-spacing:.05em;margin-bottom:7px}
+  input[type=text], input[type=date], textarea, select{width:100%;border:1px solid #32363d;background:#1b1e22;color:white;border-radius:12px;padding:12px;outline:none}
+  textarea{min-height:82px;resize:vertical}
+  .stepper{display:grid;grid-template-columns:44px 1fr 44px;align-items:center;border:1px solid #32363d;border-radius:12px;overflow:hidden;background:#1b1e22}
+  .stepper button{height:46px;border:0;background:#25292e;color:white;font-size:24px;font-weight:400}.stepper .stepvalue{text-align:center;font-size:18px;font-weight:850;font-variant-numeric:tabular-nums}.stepper .stepvalue small{font-size:11px;color:var(--muted);font-weight:700}
+  .fieldgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .sheet-actions{display:grid;grid-template-columns:1fr 1.5fr;gap:10px;position:sticky;bottom:0;background:linear-gradient(180deg,rgba(17,19,23,0),#111317 28%);padding-top:14px}
+  .empty{color:var(--muted);font-size:12px;text-align:center;padding:24px}
+  .tiny{font-size:10px;color:var(--faint);line-height:1.4}
+
+  .subtabs{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;background:#101215;border:1px solid var(--line);padding:4px;border-radius:14px;margin-bottom:14px;position:sticky;top:121px;z-index:30}
+  .subtabs button{border:0;border-radius:10px;background:transparent;color:var(--muted);font-size:11px;font-weight:850;padding:9px 4px}
+  .subtabs button.active{background:#2b2f34;color:#fff}
+  .subview{display:none}.subview.active{display:block}
+  .source-pill{display:inline-flex;align-items:center;padding:4px 7px;border-radius:999px;background:#25292e;color:#c9ccd1;font-size:9px;font-weight:800;letter-spacing:.04em;text-transform:uppercase}
+  .data-note{font-size:11px;color:var(--muted);line-height:1.45;margin-top:9px}
+  .geometry-head,.geometry-row{display:grid;grid-template-columns:minmax(0,1.35fr) .72fr .72fr;gap:8px;align-items:center}
+  .geometry-head{padding:0 0 8px;color:var(--faint);font-size:9px;text-transform:uppercase;letter-spacing:.07em;font-weight:850}
+  .geometry-head span:not(:first-child),.geometry-row strong{text-align:right}
+  .geometry-row{padding:10px 0;border-bottom:1px solid var(--line);font-size:12px}
+  .geometry-row:last-child{border:0}.geometry-row span{color:var(--muted)}.geometry-row strong{font-variant-numeric:tabular-nums}
+  .warning-card{border:1px solid rgba(255,179,64,.36);background:rgba(255,179,64,.08);border-radius:14px;padding:12px;margin-top:12px;font-size:11px;line-height:1.45;color:#e7d4af}
+  .torque-search{margin-bottom:12px}
+  .torque-group{margin-bottom:14px}
+  .torque-group-title{display:flex;justify-content:space-between;align-items:center;margin:0 2px 8px}
+  .torque-group-title h3{margin:0;font-size:14px}
+  .torque-item{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;padding:12px 0;border-bottom:1px solid var(--line)}
+  .torque-item:last-child{border-bottom:0}.torque-name{font-size:12px;font-weight:800}.torque-meta{font-size:10px;color:var(--muted);line-height:1.4;margin-top:3px}.torque-value{text-align:right;font-size:15px;font-weight:900;white-space:nowrap}.torque-value small{display:block;font-size:9px;color:var(--muted);font-weight:700;margin-top:3px}
+  .service-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:11px}
+  .service-tile{background:#111316;border:1px solid var(--line);border-radius:13px;padding:11px}.service-tile .k{font-size:9px;color:var(--muted);font-weight:800;text-transform:uppercase;letter-spacing:.05em}.service-tile .v{font-size:16px;font-weight:900;margin-top:4px}.service-tile .d{font-size:9px;color:var(--muted);line-height:1.35;margin-top:3px}
+  .component-detail{margin-bottom:14px}.component-detail summary{list-style:none;cursor:pointer}.component-detail summary::-webkit-details-marker{display:none}.detail-head{display:flex;align-items:center;justify-content:space-between;gap:10px}.detail-arrow{font-size:20px;color:var(--muted);transition:transform .15s}.component-detail[open] .detail-arrow{transform:rotate(90deg)}
+  .divider-title{font-size:11px;color:var(--accent2);font-weight:850;text-transform:uppercase;letter-spacing:.06em;margin:16px 0 7px}
+  @media(max-width:380px){.subtabs button{font-size:10px}.geometry-row{font-size:11px}}
+  @media (min-width:600px){body{padding:24px 0}.app{border-radius:26px;overflow:hidden;box-shadow:0 0 0 1px #222,0 30px 80px rgba(0,0,0,.55);min-height:900px}.safe-top{height:6px}nav{bottom:24px;border-radius:0 0 26px 26px}.fab{bottom:112px}}
+
+  .mini-add{width:32px;height:32px;border-radius:10px;border:1px solid var(--line);background:#24272c;color:#fff;font-size:20px;display:grid;place-items:center}
+  .todo-list{margin-top:10px}.todo{display:flex;gap:11px;align-items:flex-start;padding:11px 0;border-bottom:1px solid var(--line)}.todo:last-child{border-bottom:0}.todo .check{width:22px;height:22px;border:2px solid #51565f;border-radius:7px;flex:0 0 auto;display:grid;place-items:center;color:#fff;font-size:13px}.todo.done .check{background:var(--good);border-color:var(--good)}.todo.done .text{text-decoration:line-through;color:var(--faint)}.todo .text{font-size:13px;font-weight:800}.todo .small{font-size:10px;color:var(--muted);margin-top:3px}.todo-main{flex:1}.todo-delete{border:0;background:none;color:#777;font-size:18px;padding:0 2px}
+  .after-block{border:1px solid #32363d;border-radius:14px;background:#15181c;margin-bottom:14px;overflow:hidden}.after-block summary{cursor:pointer;list-style:none;padding:13px 14px;font-size:13px;font-weight:850;display:flex;justify-content:space-between;gap:10px}.after-block summary::-webkit-details-marker{display:none}.after-block summary span{font-size:10px;color:var(--muted);font-weight:700}.after-content{padding:2px 12px 2px}.after-summary{margin-top:10px;border-top:1px solid var(--line);padding-top:10px}.after-summary .line{font-size:11px;color:var(--muted);margin-top:5px}.after-summary strong{color:#fff}.ride-actions{display:flex;gap:8px;margin-top:11px}.ride-actions button{border:1px solid var(--line);background:#23262b;color:#fff;border-radius:10px;padding:8px 10px;font-size:11px;font-weight:800}.compact-sheet{max-height:72vh}.install-badge{position:fixed;left:50%;transform:translateX(-50%);bottom:92px;background:#1d2024;border:1px solid #343840;border-radius:14px;padding:10px 13px;font-size:11px;color:#d7d9dd;z-index:90;box-shadow:var(--shadow);display:none;max-width:390px;width:calc(100% - 30px)}.install-badge.show{display:block}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="safe-top"></div>
+  <header>
+    <div class="topline">
+      <div class="brand">
+        <div class="bike-dot">B</div>
+        <div class="titlewrap">
+          <div class="eyebrow">Bike Setup</div>
+          <div class="title">2026 Santa Cruz Bullit</div>
+        </div>
+      </div>
+      <button class="iconbtn" id="headerAdd" aria-label="New ride">＋</button>
+    </div>
+    <div class="bike-tabs">
+      <button class="bike-tab active">Bullit</button>
+      <button class="bike-tab disabled" title="Coming after Bullit format is approved">Supreme V5</button>
+      <button class="bike-tab disabled" title="Coming after Bullit format is approved">Nomad</button>
+    </div>
+  </header>
+
+  <main>
+    <section id="dashboard" class="screen active">
+      <div class="hero">
+        <div class="small">CURRENT SETUP</div>
+        <h1>Bullit 4 · MX 170</h1>
+        <p>Last setup saved <span id="dashSavedDate">Sep 30</span> · clicks are OUT from fully closed</p>
+
+        <div class="current-grid">
+          <div class="setup-summary">
+            <div class="setup-summary-head">
+              <div><div class="label">Fork</div><div class="value"><span id="dashForkPsi">99</span><span class="unit">psi</span></div></div>
+              <span class="status-pill"><span class="status-dot"></span>Saved</span>
+            </div>
+            <div class="sub">FOX 38 GRIP X2 · 170 mm · 1 spacer</div>
+            <div class="damping-grid">
+              <div class="damping-item"><span>HSC</span><strong id="dashHSC">8 / 11</strong></div>
+              <div class="damping-item"><span>LSC</span><strong id="dashLSC">10 / 18</strong></div>
+              <div class="damping-item"><span>HSR</span><strong id="dashHSR">6 / 8</strong></div>
+              <div class="damping-item"><span>LSR</span><strong id="dashLSR">6 / 15</strong></div>
+            </div>
+          </div>
+
+          <div class="setup-summary">
+            <div class="setup-summary-head">
+              <div><div class="label">Shock</div><div class="value"><span id="dashShockPsi">200</span><span class="unit">psi</span></div></div>
+              <span class="chip" id="dashProgression">HI</span>
+            </div>
+            <div class="sub">2026 FOX FLOAT X2 · 205×65 · Bullit tune</div>
+            <div class="damping-grid">
+              <div class="damping-item"><span>HSC</span><strong id="dashShockHSC">4</strong></div>
+              <div class="damping-item"><span>LSC</span><strong id="dashShockLSC">5</strong></div>
+              <div class="damping-item"><span>HSR</span><strong id="dashShockHSR">3</strong></div>
+              <div class="damping-item"><span>LSR</span><strong id="dashShockLSR">11</strong></div>
+            </div>
+          </div>
+
+          <div class="setup-summary wide">
+            <div class="label">Tires</div>
+            <div class="split-metrics">
+              <div class="split-metric"><div class="sub">Front · Magic Mary Radial</div><div class="value"><span id="dashFrontPsi">27</span><span class="unit">psi</span></div></div>
+              <div class="split-metric"><div class="sub">Rear · Tacky Chan Radial</div><div class="value"><span id="dashRearPsi">30</span><span class="unit">psi</span></div></div>
+            </div>
+          </div>
+
+          <div class="setup-summary wide">
+            <div class="setup-summary-head"><div class="label">Bike setup</div><span class="chip" id="todoCountChip">4 to-do</span></div>
+            <div class="setup-lines">
+              <div class="setup-line"><span>Brake pads</span><strong>TRP blue resin</strong></div>
+              <div class="setup-line"><span>Rotors</span><strong>TRP 223 / 223 mm</strong></div>
+              <div class="setup-line"><span>Anti-pedal kickback</span><strong>20°</strong></div>
+            </div>
+          </div>
+        </div>
+
+        <button class="secondary" data-go="setup" style="margin-top:12px;background:rgba(255,255,255,.055)">View baseline comparison</button>
+      </div>
+
+      <div class="section-title"><h2>Last ride</h2><button data-go="rides">History</button></div>
+      <div class="card" id="lastRideCard"></div>
+
+      <div class="section-title"><h2>Quick actions</h2></div>
+      <button class="primary" id="newRideMain">＋ New ride setup</button>
+      <div class="action-grid"><button class="secondary" data-go="setup">Compare baseline</button><button class="secondary" data-go="service">Add maintenance</button></div>
+    </section>
+
+    <section id="rides" class="screen">
+      <div class="setup-head"><div><h2>Ride log</h2><p>Newest first · full setup saved with every ride</p></div></div>
+      <button class="primary" id="newRideRides">＋ New ride</button>
+      <div style="height:14px"></div>
+      <div id="rideList"></div>
+    </section>
+
+    <section id="setup" class="screen">
+      <div class="setup-head">
+        <div><h2>Suspension</h2><p>Current vs manufacturer starting point</p></div>
+      </div>
+      <div class="seg" style="margin-bottom:14px"><button class="baseline-btn active" data-baseline="sc">Santa Cruz</button><button class="baseline-btn" data-baseline="fox">FOX</button></div>
+
+      <div class="component-card" id="forkCard">
+        <div class="component-header"><div><div class="name">Fork</div><div class="desc">FOX 38 · GRIP X2 · 170 mm</div></div><div class="status-pill"><span class="status-dot"></span>Current</div></div>
+        <div class="compare-labels" style="padding:10px 15px 0"><span>Setting</span><span>Your</span><span>Baseline</span><span>Δ</span></div>
+        <div id="forkRows"></div>
+        <div class="assessment">
+          <h4>Setup assessment</h4>
+          <p><b>Overall:</b> Your current fork is firmer in air pressure than the generic FOX FLOAT starting point, while compression is mixed relative to baseline.</p>
+          <p><b>Trade-off:</b> Use the baseline as a starting reference, not a target. Your ride notes stay attached to the exact setup that produced them.</p>
+          <p><b>Next test:</b> Change one damping parameter at a time and save a new ride so the history remains useful.</p>
+        </div>
+      </div>
+
+      <div class="component-card" id="shockCard">
+        <div class="component-header"><div><div class="name">Shock</div><div class="desc">2026 FOX FLOAT X2 · 205×65 · Bullit tune</div></div><div class="status-pill"><span class="status-dot"></span>Current</div></div>
+        <div class="compare-labels" style="padding:10px 15px 0"><span>Setting</span><span>Your</span><span>Baseline</span><span>Δ</span></div>
+        <div id="shockRows"></div>
+        <div class="assessment">
+          <h4>Baseline notes</h4>
+          <p><b>Santa Cruz reference in your notes:</b> 195 psi, 28% sag (18.2–19.5 mm).</p>
+          <p><b>Current:</b> 200 psi, HI progression. Shock damper baselines remain separate from bike-specific recommendations.</p>
+        </div>
+      </div>
+
+      <div class="tiny">Prototype note: baseline data is intentionally separated by source. FOX generic starting points and Santa Cruz/Bullit-specific values are not treated as interchangeable.</div>
+    </section>
+
+    <section id="service" class="screen">
+      <div class="setup-head"><div><h2>Service</h2><p>To do + maintenance history</p></div></div>
+      <div class="card">
+        <div class="row"><h3>To do</h3><div class="row" style="gap:8px"><span class="chip" id="todoOpenCount">0 open</span><button class="mini-add" id="addTodoBtn">＋</button></div></div>
+        <div id="todoList" class="todo-list"></div>
+      </div>
+
+      <div class="section-title"><h2>Maintenance</h2><button id="addMaintenanceBtn">Add</button></div>
+      <div id="maintenanceList"></div>
+
+      <div class="section-title"><h2>App & backup</h2></div>
+      <div class="card">
+        <div class="mini-list">
+          <div class="mini-line"><span>Storage</span><strong>Local on this iPhone</strong></div>
+          <div class="mini-line"><span>Offline</span><strong>Yes after first load</strong></div>
+          <div class="mini-line"><span>Version</span><strong>0.1 PWA</strong></div>
+        </div>
+        <div class="action-grid" style="margin-top:14px">
+          <button class="secondary" id="exportBtn">Export backup</button>
+          <button class="secondary" id="importBtn">Import backup</button>
+        </div>
+        <input id="importFile" type="file" accept="application/json,.json" hidden />
+        <div class="data-note">On iPhone: open the hosted app in Safari → Share → Add to Home Screen. Export a JSON backup periodically so your ride history is not dependent on browser storage alone.</div>
+      </div>
+    </section>
+
+    <section id="bike" class="screen">
+      <div class="setup-head"><div><h2>Specs</h2><p>Bike reference · geometry · torque · component service</p></div></div>
+      <div class="subtabs" id="specTabs">
+        <button class="spec-tab active" data-specview="build">Build</button>
+        <button class="spec-tab" data-specview="geometry">Geometry</button>
+        <button class="spec-tab" data-specview="torque">Torque</button>
+        <button class="spec-tab" data-specview="components">Components</button>
+      </div>
+
+      <div class="subview active" id="spec-build">
+        <div class="card">
+          <div class="row"><div><div class="kicker">My current build</div><h3>2026 Bullit GX · Large</h3></div><span class="source-pill">Current</span></div>
+          <div class="spec-list" style="margin-top:8px">
+            <div class="spec-row"><span>Wheel setup</span><strong>29" front / 27.5" rear</strong></div>
+            <div class="spec-row"><span>Fork</span><strong>FOX 38 Performance Elite · GRIP X2 · 170 mm</strong></div>
+            <div class="spec-row"><span>Shock</span><strong>2026 FOX FLOAT X2 · 205×65 · Bullit tune</strong></div>
+            <div class="spec-row"><span>Rear hub</span><strong>DT Swiss · anti-pedal kickback 20°</strong></div>
+            <div class="spec-row"><span>Front tire</span><strong>Magic Mary Radial · Gravity Pro</strong></div>
+            <div class="spec-row"><span>Rear tire</span><strong>Tacky Chan Radial · Gravity Pro · Super Soft</strong></div>
+            <div class="spec-row"><span>Handlebar</span><strong>OneUp Carbon</strong></div>
+            <div class="spec-row"><span>Grips</span><strong>ODI half-waffle</strong></div>
+            <div class="spec-row"><span>Brakes</span><strong>Shimano Saint BR-M820</strong></div>
+            <div class="spec-row"><span>Rotors / pads</span><strong>TRP 223 / 223 · blue resin</strong></div>
+          </div>
+        </div>
+
+        <div class="section-title"><h2>Factory reference</h2></div>
+        <div class="card">
+          <div class="row"><div><div class="kicker">Santa Cruz</div><h3>2026 Bullit GX AXS</h3></div><span class="source-pill">Factory</span></div>
+          <div class="spec-list" style="margin-top:8px">
+            <div class="spec-row"><span>Frame</span><strong>Carbon C · MX · 170 mm</strong></div>
+            <div class="spec-row"><span>Fork</span><strong>FOX 38 Performance Elite · GRIP X2 · 170 mm</strong></div>
+            <div class="spec-row"><span>Shock</span><strong>FOX Float X Performance Elite · 205×65</strong></div>
+            <div class="spec-row"><span>Drivetrain</span><strong>SRAM GX Eagle AXS T-Type · 12 spd</strong></div>
+            <div class="spec-row"><span>Cranks</span><strong>SRAM GX Eagle · 155 mm</strong></div>
+            <div class="spec-row"><span>Stem</span><strong>OneUp Enduro · 42 mm</strong></div>
+            <div class="spec-row"><span>Dropper · Large</span><strong>OneUp · 210 mm · 31.6</strong></div>
+            <div class="spec-row"><span>Motor / battery</span><strong>Bosch Performance CX BDU38 · 600 Wh</strong></div>
+            <div class="spec-row"><span>Factory weight</span><strong>49.4 lb / 22.41 kg</strong></div>
+          </div>
+          <div class="data-note">Factory values are kept separate from your modified current build so service information does not silently follow parts you have replaced.</div>
+        </div>
+      </div>
+
+      <div class="subview" id="spec-geometry">
+        <div class="card">
+          <div class="row"><div><div class="kicker">2026 Bullit 4</div><h3>Large geometry</h3></div><span class="source-pill">Santa Cruz</span></div>
+          <div class="geometry-head" style="margin-top:14px"><span>Measurement</span><span>HI</span><span>LO</span></div>
+          <div class="geometry-row"><span>Reach</span><strong>480 mm</strong><strong>477 mm</strong></div>
+          <div class="geometry-row"><span>Stack</span><strong>640 mm</strong><strong>643 mm</strong></div>
+          <div class="geometry-row"><span>Head tube angle</span><strong>63.6°</strong><strong>63.3°</strong></div>
+          <div class="geometry-row"><span>BB height</span><strong>346 mm</strong><strong>342 mm</strong></div>
+          <div class="geometry-row"><span>BB drop · front</span><strong>27 mm</strong><strong>31 mm</strong></div>
+          <div class="geometry-row"><span>BB drop · rear</span><strong>9 mm</strong><strong>13 mm</strong></div>
+          <div class="geometry-row"><span>Seat tube angle</span><strong>78.7°</strong><strong>78.4°</strong></div>
+          <div class="geometry-row"><span>Standover</span><strong>738 mm</strong><strong>733 mm</strong></div>
+          <div class="geometry-row"><span>Head tube length</span><strong>120 mm</strong><strong>120 mm</strong></div>
+          <div class="geometry-row"><span>Rear center</span><strong>446 mm</strong><strong>446 mm</strong></div>
+          <div class="geometry-row"><span>Front center</span><strong>834 mm</strong><strong>834 mm</strong></div>
+          <div class="geometry-row"><span>Wheelbase</span><strong>1280 mm</strong><strong>1280 mm</strong></div>
+          <div class="geometry-row"><span>Top tube</span><strong>617 mm</strong><strong>617 mm</strong></div>
+          <div class="geometry-row"><span>Seat tube</span><strong>420 mm</strong><strong>420 mm</strong></div>
+        </div>
+
+        <div class="section-title"><h2>Frame facts</h2></div>
+        <div class="card">
+          <div class="spec-list">
+            <div class="spec-row"><span>Travel</span><strong>170 mm front / rear</strong></div>
+            <div class="spec-row"><span>Fork offset</span><strong>44 mm</strong></div>
+            <div class="spec-row"><span>Shock</span><strong>205×65 · upper trunnion · lower 8×30</strong></div>
+            <div class="spec-row"><span>Rear spacing</span><strong>148 mm</strong></div>
+            <div class="spec-row"><span>Rear brake mount</span><strong>200 PM</strong></div>
+            <div class="spec-row"><span>Max rotor size</span><strong>220 mm</strong></div>
+            <div class="spec-row"><span>Max tire clearance</span><strong>2.5"</strong></div>
+            <div class="spec-row"><span>Max chainring</span><strong>36T</strong></div>
+            <div class="spec-row"><span>UDH</span><strong>Yes</strong></div>
+          </div>
+          <div class="warning-card"><b>Current brake note:</b> Santa Cruz lists a 220 mm maximum rotor for the Bullit 4 frame. Your current TRP rotors are labeled 223 mm, so the app flags that 3 mm nominal difference for reference rather than treating the factory max as your installed size.</div>
+        </div>
+      </div>
+
+      <div class="subview" id="spec-torque">
+        <div class="torque-search"><input id="torqueSearch" type="text" placeholder="Search torque — shock, axle, stem, crank…" /></div>
+        <div id="torqueList">
+          <div class="torque-group" data-torque-group>
+            <div class="torque-group-title"><h3>Frame & suspension</h3><span class="source-pill">Santa Cruz</span></div>
+            <div class="card">
+              <div class="torque-item" data-search="shock lower flip chip m8x45"><div><div class="torque-name">Shock lower / rate flip-chip bolt</div><div class="torque-meta">M8×45 low-head SHCS · Loctite 242 on threads</div></div><div class="torque-value">15.6 Nm</div></div>
+              <div class="torque-item" data-search="shock upper trunnion m10x10"><div><div class="torque-name">Shock upper trunnion screws</div><div class="torque-meta">M10×10 · 2 bolts · Loctite 242 threads, grease shaft</div></div><div class="torque-value">16 Nm</div></div>
+              <div class="torque-item" data-search="pivot linkage axle m15x91"><div><div class="torque-name">Linkage pivot axle · M15×91</div><div class="torque-meta">Loctite 242 threads only · grease shaft</div></div><div class="torque-value">20 Nm</div></div>
+              <div class="torque-item" data-search="pivot linkage axle m15x80.5"><div><div class="torque-name">Linkage pivot axle · M15×80.5</div><div class="torque-meta">Loctite 242 threads only · grease shaft</div></div><div class="torque-value">20 Nm</div></div>
+              <div class="torque-item" data-search="linkage m6x20"><div><div class="torque-name">Linkage M6×20 SHCS</div><div class="torque-meta">2 bolts · Loctite 242</div></div><div class="torque-value">9 Nm</div></div>
+              <div class="torque-item" data-search="linkage m10x20"><div><div class="torque-name">Linkage M10×20 bolts</div><div class="torque-meta">2 bolts · Loctite 242</div></div><div class="torque-value">16 Nm</div></div>
+              <div class="torque-item" data-search="chainstay rear triangle m10x26"><div><div class="torque-name">Chainstay / rear-triangle M10×26</div><div class="torque-meta">2 bolts · Loctite 242 threads · grease shaft</div></div><div class="torque-value">16 Nm</div></div>
+              <div class="torque-item" data-search="udh hanger"><div><div class="torque-name">UDH screw</div><div class="torque-meta">Reverse thread</div></div><div class="torque-value">20 Nm</div></div>
+              <div class="torque-item" data-search="rear axle wheel"><div><div class="torque-name">Rear axle · 12×173.7</div><div class="torque-meta">Santa Cruz specifies grease on shaft + threads but does not publish a torque in the Bullit exploded table</div></div><div class="torque-value">See axle<small>marking / manual</small></div></div>
+            </div>
+          </div>
+
+          <div class="torque-group" data-torque-group>
+            <div class="torque-group-title"><h3>Cockpit, wheels & drivetrain</h3><span class="source-pill">Component</span></div>
+            <div class="card">
+              <div class="torque-item" data-search="fox front axle pinch fork"><div><div class="torque-name">FOX 38 floating-axle pinch bolt</div><div class="torque-meta">Drive-side dropout · after settling fork</div></div><div class="torque-value">5.1 Nm<small>FOX</small></div></div>
+              <div class="torque-item" data-search="fox kaboltx axle"><div><div class="torque-name">FOX KaboltX front axle</div><div class="torque-meta">Torque value is etched on the axle head</div></div><div class="torque-value">Axle marking<small>FOX</small></div></div>
+              <div class="torque-item" data-search="stem faceplate handlebar oneup"><div><div class="torque-name">OneUp stem faceplate</div><div class="torque-meta">Current OneUp carbon bar compatible limit</div></div><div class="torque-value">6 Nm<small>OneUp</small></div></div>
+              <div class="torque-item" data-search="stem steerer oneup"><div><div class="torque-name">OneUp stem steerer bolts</div><div class="torque-meta">Align stem after headset preload</div></div><div class="torque-value">9 Nm<small>OneUp</small></div></div>
+              <div class="torque-item" data-search="headset top cap oneup"><div><div class="torque-name">Headset top cap preload</div><div class="torque-meta">OneUp install guide · preload only, not a structural clamp</div></div><div class="torque-value">2–4 Nm<small>OneUp</small></div></div>
+              <div class="torque-item" data-search="crank crankarm sram gx isis bosch"><div><div class="torque-name">SRAM GX ISIS crankarm bolt</div><div class="torque-meta">Both sides · 8 mm hex · grease ISIS spindle</div></div><div class="torque-value">54 Nm<small>SRAM</small></div></div>
+              <div class="torque-item" data-search="brake caliper shimano saint"><div><div class="torque-name">Shimano Saint caliper / adapter bolts</div><div class="torque-meta">BR-M820 family mounting hardware</div></div><div class="torque-value">6–8 Nm<small>Shimano</small></div></div>
+            </div>
+          </div>
+        </div>
+        <div class="tiny">Torque reference is deliberately source-specific. If a component changes, its manufacturer torque should replace the old value instead of assuming the frame spec still applies.</div>
+      </div>
+
+      <div class="subview" id="spec-components">
+        <details class="card component-detail" open>
+          <summary><div class="detail-head"><div><div class="kicker">Fork</div><h3>FOX 38 Performance Elite · GRIP X2</h3></div><span class="detail-arrow">›</span></div></summary>
+          <div class="data-note">2026 · 170 mm · FLOAT NA2 · lower-leg quick reference</div>
+          <div class="divider-title">Lower service fluids</div>
+          <div class="service-grid">
+            <div class="service-tile"><div class="k">Air-side bath</div><div class="v">20 cc</div><div class="d">FOX 20 WT Gold</div></div>
+            <div class="service-tile"><div class="k">Damper-side bath</div><div class="v">40 cc</div><div class="d">FOX 4 WT · GRIP X2</div></div>
+            <div class="service-tile"><div class="k">Foam rings</div><div class="v">20 WT</div><div class="d">Soak in FOX 20 WT Gold</div></div>
+            <div class="service-tile"><div class="k">Air chamber</div><div class="v">3 cc</div><div class="d">FOX 20 WT Gold · only if air spring is opened</div></div>
+          </div>
+          <div class="divider-title">Reassembly torque</div>
+          <div class="spec-list">
+            <div class="spec-row"><span>Air-side bottom nut</span><strong>5.7 Nm / 50 in-lb</strong></div>
+            <div class="spec-row"><span>GRIP X2 damper bottom nut</span><strong>12.4 Nm / 110 in-lb</strong></div>
+            <div class="spec-row"><span>Air-spring topcap</span><strong>24.8 Nm / 220 in-lb</strong></div>
+          </div>
+          <div class="divider-title">Parts / interval</div>
+          <div class="spec-list">
+            <div class="spec-row"><span>Dust-wiper kit</span><strong>803-01-493</strong></div>
+            <div class="spec-row"><span>GRIP X2 seal kit</span><strong>803-04-086</strong></div>
+            <div class="spec-row"><span>FOX listed full-service interval</span><strong>125 hr</strong></div>
+          </div>
+          <div class="warning-card"><b>Service distinction:</b> 20 cc / 40 cc are bath-oil quantities for a lower-leg service. The damper itself uses FOX 4 WT internally, but a full GRIP X2 damper rebuild is a separate procedure from a lowers service.</div>
+        </details>
+
+        <details class="card component-detail">
+          <summary><div class="detail-head"><div><div class="kicker">Rear shock</div><h3>2026 FOX FLOAT X2 · 205×65</h3></div><span class="detail-arrow">›</span></div></summary>
+          <div class="spec-list" style="margin-top:10px">
+            <div class="spec-row"><span>Bike tune</span><strong>Bullit-specific</strong></div>
+            <div class="spec-row"><span>Upper mount</span><strong>Trunnion · 16 Nm screws</strong></div>
+            <div class="spec-row"><span>Lower mount</span><strong>8×30 · rate flip-chip bolt 15.6 Nm</strong></div>
+          </div>
+          <div class="data-note">Next component-service pass can add the exact FLOAT X2 air-can service fluids, seals and internal torques after the shock ID/tune is captured.</div>
+        </details>
+
+        <details class="card component-detail">
+          <summary><div class="detail-head"><div><div class="kicker">Brakes</div><h3>Shimano Saint · TRP 223 rotors</h3></div><span class="detail-arrow">›</span></div></summary>
+          <div class="spec-list" style="margin-top:10px">
+            <div class="spec-row"><span>Caliper / adapter bolts</span><strong>6–8 Nm</strong></div>
+            <div class="spec-row"><span>Pads</span><strong>TRP blue resin</strong></div>
+            <div class="spec-row"><span>Rotors</span><strong>TRP 223 mm · front / rear</strong></div>
+          </div>
+        </details>
+
+        <details class="card component-detail">
+          <summary><div class="detail-head"><div><div class="kicker">Cockpit & drivetrain</div><h3>OneUp / SRAM GX</h3></div><span class="detail-arrow">›</span></div></summary>
+          <div class="spec-list" style="margin-top:10px">
+            <div class="spec-row"><span>Stem faceplate</span><strong>6 Nm</strong></div>
+            <div class="spec-row"><span>Stem steerer bolts</span><strong>9 Nm</strong></div>
+            <div class="spec-row"><span>SRAM GX ISIS crankarms</span><strong>54 Nm</strong></div>
+          </div>
+        </details>
+      </div>
+    </section>
+  </main>
+
+  <button class="fab" id="fab" aria-label="New ride">＋</button>
+  <nav>
+    <button class="navbtn active" data-screen="dashboard"><span class="ico">⌂</span><span>Dashboard</span></button>
+    <button class="navbtn" data-screen="rides"><span class="ico">◷</span><span>Rides</span></button>
+    <button class="navbtn" data-screen="setup"><span class="ico">⚙︎</span><span>Setup</span></button>
+    <button class="navbtn" data-screen="service"><span class="ico">✓</span><span>Service</span></button>
+    <button class="navbtn" data-screen="bike"><span class="ico">≡</span><span>Specs</span></button>
+  </nav>
+</div>
+
+<div class="modal-back" id="rideModal">
+  <div class="sheet">
+    <div class="grab"></div>
+    <h2>New ride</h2>
+    <div class="subhead">Prefilled from your current setup — change only what you touched.</div>
+
+    <div class="fieldgrid">
+      <div class="field"><label>Date</label><input id="rideDate" type="date" /></div>
+      <div class="field"><label>Conditions</label><select id="conditions"><option>Dry</option><option>Hero dirt</option><option>Damp</option><option>Wet</option><option>Dusty</option><option>Mud</option></select></div>
+    </div>
+    <div class="field"><label>Location / trail</label><input id="location" type="text" placeholder="Raging River · Mayday / BLT" /></div>
+
+    <div class="fieldgrid">
+      <div class="field"><label>Front tire PSI</label><div class="stepper" data-target="frontPsi" data-step="0.5"><button>-</button><div class="stepvalue"><span id="frontPsi">27</span> <small>psi</small></div><button>+</button></div></div>
+      <div class="field"><label>Rear tire PSI</label><div class="stepper" data-target="rearPsi" data-step="0.5"><button>-</button><div class="stepvalue"><span id="rearPsi">30</span> <small>psi</small></div><button>+</button></div></div>
+    </div>
+
+    <div class="fieldgrid">
+      <div class="field"><label>Fork PSI</label><div class="stepper" data-target="forkPsi" data-step="1"><button>-</button><div class="stepvalue"><span id="forkPsi">99</span> <small>psi</small></div><button>+</button></div></div>
+      <div class="field"><label>Shock PSI</label><div class="stepper" data-target="shockPsi" data-step="1"><button>-</button><div class="stepvalue"><span id="shockPsi">200</span> <small>psi</small></div><button>+</button></div></div>
+    </div>
+
+    <div class="field"><label>Fork damping · clicks OUT from closed</label>
+      <div class="fieldgrid">
+        <div class="stepper" data-target="hsc" data-step="1"><button>-</button><div class="stepvalue">HSC <span id="hsc">8</span><small>/11</small></div><button>+</button></div>
+        <div class="stepper" data-target="lsc" data-step="1"><button>-</button><div class="stepvalue">LSC <span id="lsc">10</span><small>/18</small></div><button>+</button></div>
+        <div class="stepper" data-target="hsr" data-step="1"><button>-</button><div class="stepvalue">HSR <span id="hsr">6</span><small>/8</small></div><button>+</button></div>
+        <div class="stepper" data-target="lsr" data-step="1"><button>-</button><div class="stepvalue">LSR <span id="lsr">6</span><small>/15</small></div><button>+</button></div>
+      </div>
+    </div>
+
+    <div class="field"><label>Shock damping · clicks OUT from closed</label>
+      <div class="fieldgrid">
+        <div class="stepper" data-target="shockHsc" data-step="1"><button>-</button><div class="stepvalue">HSC <span id="shockHsc">4</span></div><button>+</button></div>
+        <div class="stepper" data-target="shockLsc" data-step="1"><button>-</button><div class="stepvalue">LSC <span id="shockLsc">5</span></div><button>+</button></div>
+        <div class="stepper" data-target="shockHsr" data-step="1"><button>-</button><div class="stepvalue">HSR <span id="shockHsr">3</span></div><button>+</button></div>
+        <div class="stepper" data-target="shockLsr" data-step="1"><button>-</button><div class="stepvalue">LSR <span id="shockLsr">11</span></div><button>+</button></div>
+      </div>
+    </div>
+
+    <div class="field"><label>Shock progression</label><div class="seg"><button class="progression active" data-mode="HI">HI</button><button class="progression" data-mode="LO">LO</button></div></div>
+    <div class="field"><label>Before-ride note</label><textarea id="rideNotes" placeholder="What are you testing or changing on this ride?"></textarea></div>
+
+    <details class="after-block" id="afterRideBlock">
+      <summary>After ride notes <span>optional now — editable later</span></summary>
+      <div class="after-content">
+        <div class="fieldgrid">
+          <div class="field"><label>Overall feel</label><select id="afterOverall"><option value="">—</option><option>Excellent</option><option>Good</option><option>Mixed</option><option>Harsh</option><option>Soft</option><option>Unsettled</option></select></div>
+          <div class="field"><label>Bottom-out?</label><select id="afterBottom"><option value="">—</option><option>No</option><option>Light</option><option>Hard</option></select></div>
+        </div>
+        <div class="fieldgrid">
+          <div class="field"><label>Fork travel used</label><input id="afterForkTravel" type="text" placeholder="e.g. 160 mm / full" /></div>
+          <div class="field"><label>Shock travel used</label><input id="afterShockTravel" type="text" placeholder="e.g. 90% / full" /></div>
+        </div>
+        <div class="field"><label>Grip / support / chatter</label><textarea id="afterFeel" placeholder="Front grip, support in berms, hand chatter, rear traction…"></textarea></div>
+        <div class="field"><label>What worked</label><textarea id="afterWorked" placeholder="What should stay the same?"></textarea></div>
+        <div class="field"><label>What didn't</label><textarea id="afterDidnt" placeholder="What felt wrong or limited pace?"></textarea></div>
+        <div class="field"><label>Next change / test</label><textarea id="afterNext" placeholder="One change to try next ride"></textarea></div>
+        <div class="field"><label>Other notes</label><textarea id="afterNotes" placeholder="Anything else worth remembering"></textarea></div>
+      </div>
+    </details>
+
+    <div class="sheet-actions"><button class="secondary" id="cancelRide">Cancel</button><button class="primary" id="saveRide">Save ride</button></div>
+  </div>
+</div>
+
+
+<div class="modal-back" id="simpleModal">
+  <div class="sheet compact-sheet">
+    <div class="grab"></div>
+    <h2 id="simpleTitle">Add item</h2>
+    <div class="subhead" id="simpleSub"></div>
+    <div id="simpleFields"></div>
+    <div class="sheet-actions"><button class="secondary" id="simpleCancel">Cancel</button><button class="primary" id="simpleSave">Save</button></div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+
+</body>
+</html>

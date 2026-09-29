@@ -1,37 +1,55 @@
-# BikeWorkshop — iPhone prototype v0.1
+# Bike Workshop PWA — v0.1
 
-Native SwiftUI + SwiftData prototype for the user's 2026 Santa Cruz Bullit GX (Large). The Bullit is the template bike; Supreme V5 and Nomad are intentionally not implemented yet.
+Installable, offline-first iPhone PWA for the 2026 Santa Cruz Bullit.
 
-## Requirements
-- Xcode 16 or newer recommended
-- iOS 17.0+ (SwiftData)
-- An Apple developer signing team to install on a physical iPhone
+## What is in v0.1
 
-## Run on iPhone
-1. Open `BikeWorkshop.xcodeproj` in Xcode.
-2. Select the **BikeWorkshop** target → **Signing & Capabilities**.
-3. Choose your Apple ID / Team and, if Xcode asks, change the bundle identifier to something unique.
-4. Connect the iPhone, select it as the run destination, and press Run.
-5. If prompted on the phone, enable Developer Mode / trust the developer certificate.
+- Garmin-inspired Bullit dashboard with current fork, shock, tire and bike setup in one glanceable area.
+- Full HSC / LSC / HSR / LSR values; suspension clicks are counted **OUT from fully closed**.
+- New Ride prefilled from the current setup.
+- Dedicated After Ride notes: overall feel, travel used, bottom-out, grip/support/chatter, what worked, what didn't and next test.
+- Ride/setup history seeded from the Bullit setup note.
+- FOX / Santa Cruz baseline comparison UI. Unverified bike-specific suspension values remain blank rather than being guessed.
+- Interactive To Do list and maintenance history.
+- 2026 Bullit GX Large build / geometry reference.
+- Searchable common torque specifications.
+- Component service reference, starting with the FOX 38 GRIP X2 lower-leg service.
+- IndexedDB local data storage.
+- Offline service-worker cache.
+- JSON Export / Import backup.
+- Home Screen PWA manifest and app icons.
+- Supreme V5 and Nomad are intentionally left as future bike tabs until the Bullit workflow is approved.
 
-## v0.1 included
-- Garmin-inspired dark, glanceable dashboard
-- Unified Current Setup: fork + shock + tires + full HSC/LSC/HSR/LSR
-- Ride log with New Ride prefilled from previous setup
-- Dedicated After Ride notes and next-test fields
-- FOX / Santa Cruz baseline comparison bars
-- To Do + Maintenance
-- Official 2026 Bullit Large geometry
-- Searchable torque reference
-- Component reference area
-- FOX 38 GRIP X2 lower-service quick reference
-- Local/offline persistence using SwiftData
+## Run locally on Linux
 
-## Important data notes
-- Suspension clicks are stored as **clicks OUT from fully closed**: close clockwise, then count counterclockwise.
-- The 9/30/2026 source note has a blank rear-shock LSC field. v0.1 carries forward LSC 5 from 9/9/2026 and flags it for confirmation.
-- Santa Cruz publishes no rear-axle torque in the Bullit MY26 exploded table; v0.1 says “Not published” rather than guessing.
-- Santa Cruz lists a 220 mm maximum rotor for the frame, while the current bike data records TRP 223 mm rotors. The app preserves both facts instead of silently reconciling them.
+A service worker needs HTTP/HTTPS; do not open `index.html` with a `file://` URL.
 
-## Sources
-See `SOURCES.md`. Manufacturer/service values were checked against official Santa Cruz, FOX, OneUp and SRAM pages on 2026-09-29. Shimano caliper mounting is shown as 6–8 Nm and should still be verified against the exact adapter/bolt arrangement during service.
+```bash
+cd BikeWorkshop_PWA_v0.1
+python3 -m http.server 8080
+```
+
+Then open `http://localhost:8080` on the Linux machine.
+
+## Put it on the iPhone
+
+The iPhone needs an HTTPS URL. GitHub Pages is an easy free option:
+
+1. Create a **private or public** GitHub repository for the project. (GitHub Pages availability for private repositories depends on the GitHub plan.)
+2. Copy the contents of this folder into the repository root.
+3. Commit and push to the `main` branch.
+4. In GitHub: **Settings → Pages → Source → GitHub Actions**.
+5. The included `.github/workflows/pages.yml` deploys the site.
+6. Open the resulting `https://...github.io/.../` address in **Safari on the iPhone**.
+7. Tap **Share → Add to Home Screen → Add**.
+8. Launch **Bike Workshop** from the new Home Screen icon once while online. After the service worker caches the app shell, the core app works offline.
+
+## Data / backup behavior
+
+Ride, To Do and maintenance data stay in IndexedDB on the current browser/device. Use **Service → App & backup → Export backup** periodically. Import replaces the local Bike Workshop data with the selected backup.
+
+Clearing Safari website data can remove the local database, which is why JSON backup is included from the first PWA build.
+
+## Developer notes
+
+This version intentionally has **no build tool or external JavaScript dependencies**. That makes it easy to develop on Linux, host on any static HTTPS service, and keep the entire app available offline. The data model is kept simple enough to migrate later to SwiftData if a native iOS version becomes worthwhile.
