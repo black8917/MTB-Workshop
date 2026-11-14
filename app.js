@@ -1,6 +1,6 @@
 'use strict';
 
-const APP_VERSION = '0.4.2';
+const APP_VERSION = '0.4.3';
 const DB_NAME = 'BikeWorkshopPWA';
 const DB_VERSION = 1;
 let db;
@@ -60,7 +60,7 @@ const BIKE_PROFILES={
 };
 const FIRST_SETUP={
  nomad:{bikeId:'nomad',id:'nomad_current',date:'2026-11-14',location:'Current setup',frontPsi:null,rearPsi:null,frontTire:'Not recorded',rearTire:'Not recorded',forkPsi:85,forkTravel:180,spacers:1,forkSagMm:null,shockPsi:null,shockStroke:null,shockSagMm:null,shockType:'air',springRate:null,hbo:null,forkModel:'FOX 38 Performance Elite GRIP X2',shockModel:'Rear shock model to confirm',hsc:6,lsc:10,hsr:5,lsr:6,shockHsc:null,shockLsc:null,shockHsr:null,shockLsr:null,geometry:'Unrecorded',progression:'Unrecorded',notes:'Historical Nomad notes: fork recorded; rear shock, tires and remaining settings need verification.',after:{}},
- supreme:{bikeId:'supreme',id:'supreme_current',date:'2026-11-14',location:'Current setup',frontPsi:27,rearPsi:30,frontTire:'Model to confirm · CushCore front',rearTire:'Model to confirm',forkPsi:85,forkTravel:203,spacers:2,forkSagMm:null,shockPsi:null,shockStroke:75,shockSagMm:null,shockType:'coil',springRate:550,hbo:3,forkModel:'2027 FOX 40 Factory GRIP X2',shockModel:'RockShox Vivid Ultimate DH Coil 250×75',hsc:5,lsc:9,hsr:8,lsr:9,shockHsc:1,shockLsc:0,shockHsr:null,shockLsr:4,geometry:'HIGH',progression:'LINEAR',notes:'Latest recorded Supreme: 550 lb/in spring supersedes older 500; High/Linear. Earlier ~17% sag requires recheck.',after:{}}
+ supreme:{bikeId:'supreme',id:'supreme_current',date:'2026-11-14',location:'Current setup',frontPsi:27,rearPsi:30,frontTire:'Model to confirm · CushCore front',rearTire:'Model to confirm',forkPsi:85,forkTravel:203,spacers:2,forkSagMm:null,shockPsi:null,shockStroke:75,shockSagMm:null,shockType:'coil',springRate:450,hbo:3,forkModel:'2027 FOX 40 Factory GRIP X2',shockModel:'RockShox Vivid Ultimate DH Coil 250×75',hsc:5,lsc:9,hsr:8,lsr:9,shockHsc:1,shockLsc:0,shockHsr:null,shockLsr:4,geometry:'HIGH',progression:'LINEAR',notes:'Spring correction: original 450 lb/in spring reinstalled; only 450 and 500 lb/in confirmed. Prior 550 entries likely transcription errors; High/Linear. Earlier ~17% sag requires recheck.',after:{}}
 };
 const profile=()=>BIKE_PROFILES[activeBike];
 const setupKey=(id=activeBike)=>id==='bullit'?'currentSetupV2':'currentSetupV4_'+id;
@@ -205,6 +205,22 @@ async function seedIfNeeded(){
     const todosById=new Set((await getAll('todos')).map(t=>t.id));
     for(const entry of SUPREME_IMPORTED_TODOS)if(!todosById.has(entry.id))await put('todos',entry);
     await put('meta',{key:'supremeArchiveV042',value:true});
+  }
+  // v0.4.3 correction: preserve the source text of old setup logs, but flag
+  // unconfirmed 550lb values and correct only the generated default setup.
+  if(!(await getMeta('supremeSpringCorrectionV043'))){
+    const key=setupKey('supreme'),setup=await getMeta(key);
+    if(setup?.id==='supreme_current'&&setup.springRate===550){
+      await put('meta',{key,value:{...setup,springRate:450,notes:'Spring correction: original 450 lb/in spring reinstalled; 500 lb/in previously tested. Historical 550 notes unverified. '+(setup.notes||'')}});
+    }
+    for(const item of await getAll('rides')){
+      if(item.bikeId==='supreme'&&item.id?.startsWith('supreme_history_')&&item.springRate===550){
+        await put('rides',{...item,springRate:null,
+          historicalSpringRateAsWritten:550,springRateUnverified:true,
+          notes:(item.notes||'')+' [Correction Nov 2026: 550 lb/in appears to be a transcription error; rider recalls only 450 and 500 lb/in. Actual rate on this date unconfirmed.]'});
+      }
+    }
+    await put('meta',{key:'supremeSpringCorrectionV043',value:true});
   }
   await put('meta',{key:'appVersion',value:APP_VERSION});
 }
