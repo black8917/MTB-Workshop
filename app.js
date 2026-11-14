@@ -1,6 +1,6 @@
 'use strict';
 
-const APP_VERSION = '0.4.1';
+const APP_VERSION = '0.4.2';
 const DB_NAME = 'BikeWorkshopPWA';
 const DB_VERSION = 1;
 let db;
@@ -67,6 +67,56 @@ const setupKey=(id=activeBike)=>id==='bullit'?'currentSetupV2':'currentSetupV4_'
 const displayNum=v=>Number.isFinite(v)?String(v):'—';
 const nullableNum=v=>v===null||v===''||v===undefined?null:Number(v);
 const fieldNumber=id=>{const t=$(id).textContent.trim();return t==='—'||t===''?null:Number(t);};
+
+
+// Historical user notes; snapshots are setup logs, not actual rides.
+// Fields absent from the note are kept unknown rather than carried forward.
+const SUPREME_HISTORICAL_RAW=[
+ {date:'2026-07-15',forkPsi:80,spacers:2,hsc:7,lsc:13,hsr:8,lsr:8,
+  shockModel:'RockShox Vivid Select (new at time)',springRate:500,shockLsr:8,hbo:3,
+  notes:'Rolled faster with higher pressure; hoped for more bite. Rebound too slow at 6, changed to 8. Fork LSC13 HSC7 LSR8 HSR8, 80 psi, 2 tokens. New Vivid Select basic, 500 lb spring, 1 turn preload, LSR8, HBO3. Tires: Albert Radial Ultra Soft Gravity front 21/26 psi and Tacky Chan Ultra Soft Gravity Pro rear 23/28 psi (pairs as recorded; exact selected PSI unknown).'},
+ {date:'2026-07-16',forkPsi:79,spacers:2,hsc:7,lsc:13,hsr:8,lsr:8,
+  springRate:500,shockLsc:3,shockHsc:3,shockLsr:4,hbo:3,historicalSagPct:17,
+  notes:'Fork 79 psi, 2 tokens, LSC13 HSC7 LSR8 HSR8. Vivid Ultimate DH 500 lb spring, 17% sag, preload 1T, 7wt oil noted, LSC3 HSC3 LSR4 HBO3. Albert Radial Ultra Soft Gravity front 21/26 psi and Tacky Chan Ultra Soft Gravity Pro rear 23/28 psi (paired values not treated as single pressures).'},
+ {date:'2026-07-18',forkPsi:86,spacers:2,hsc:5,lsc:9,hsr:8,lsr:9,
+  springRate:500,shockLsc:0,shockHsc:1,shockLsr:4,hbo:3,historicalSagPct:17,
+  frontPsi:27,rearPsi:30,frontTire:'Albert Radial Ultra Soft Gravity',rearTire:'Tacky Chan Ultra Soft Gravity Pro',
+  notes:'Fork 86 psi, 2 tokens, LSC9 HSC5 LSR9/16 HSR8/9. Vivid Ultimate DH 500 lb spring, 17% sag, preload 1T, 7wt oil noted; LSC0 HSC1 LSR4/19 HBO3. Tires F27/R30.'},
+ {date:'2026-07-23',forkPsi:86,spacers:1,hsc:5,lsc:9,hsr:7,lsr:9,
+  springRate:550,shockLsc:2,shockHsc:2,shockLsr:4,hbo:2,
+  frontPsi:25,rearPsi:28,frontTire:'Magic Mary Radial Ultra Soft Gravity',rearTire:'Tacky Chan Radial Ultra Soft Gravity Pro',
+  ochainDeg:9,chainstayAdjustmentMm:6,barRollBackDeg:5,
+  notes:'New O-Chain 9°, +6mm chainstay, bars rolled back 5°. Fork 86 psi, 1 token, LSC9 HSC5 LSR9/16 HSR7/9. Vivid Ultimate DH 550 lb spring, preload 1T, 7wt oil noted, LSC2 HSC2 LSR4/19 HBO2. Magic Mary F25 and Tacky Chan R28.'},
+ {date:'2026-07-24',forkPsi:86,spacers:1,hsc:5,lsc:9,hsr:7,lsr:9,
+  springRate:550,shockLsc:2,shockHsc:2,shockLsr:4,hbo:2,ochainDeg:9,
+  notes:'New O-Chain 9°. Fork 86 psi, 1 token, LSC9 HSC5 LSR9/16 HSR7/9. Vivid Ultimate DH 550 lb spring, preload 1T, 7wt oil noted, LSC2 HSC2 LSR4/19 HBO2. Tire pressures not recorded.'},
+ {date:'2026-07-26',forkPsi:86,spacers:1,hsc:5,lsc:9,hsr:7,lsr:9,
+  springRate:550,shockLsc:1,shockHsc:2,shockLsr:3,hbo:1,
+  notes:'Fork 86 psi, 1 token, LSC9 HSC5 LSR9/16 HSR7/9. Vivid Ultimate DH 550 lb spring, preload 1T, 7wt oil noted, LSC1 HSC2 LSR3/19 HBO1.'},
+ {date:'2026-07-30',forkPsi:88,spacers:0,hsc:5,lsc:9,hsr:7,lsr:11,
+  springRate:550,shockLsc:1,shockHsc:2,shockLsr:3,hbo:1,
+  notes:'Fork 88 psi, 0 tokens, LSC9 HSC5 LSR11/16 HSR7/9. Vivid Ultimate DH 550 lb spring, preload 1T, 7wt oil noted, LSC1 HSC2 LSR3/19 HBO1.'},
+ {date:'2026-08-16',forkPsi:88,spacers:0,hsc:9,lsc:10,hsr:6,lsr:10,
+  springRate:550,shockLsc:2,shockHsc:2,shockLsr:3,hbo:1,
+  frontPsi:24,rearPsi:26,frontTire:'Magic Mary Radial Ultra Soft Gravity',rearTire:'Tacky Chan Ultra Soft Gravity Pro',
+  notes:'Fork 88 psi, 0 tokens, LSC10 HSC9 LSR10/16 HSR6/9. Vivid Ultimate DH 550 lb spring, preload 1T, 7wt oil noted, LSC2 HSC2 LSR3/19 HBO1. Magic Mary F24 psi / Tacky Chan R26 psi.'}
+];
+const SUPREME_HISTORICAL_SETUPS=SUPREME_HISTORICAL_RAW.map(r=>({
+ ...FIRST_SETUP.supreme,...r,id:'supreme_history_'+r.date,bikeId:'supreme',recordType:'setup',
+ location:'Historical suspension setup',createdAt:r.date+'T12:00:00',shockSagMm:null,shockHsr:null,
+ frontPsi:Object.hasOwn(r,'frontPsi')?r.frontPsi:null,rearPsi:Object.hasOwn(r,'rearPsi')?r.rearPsi:null,
+ frontTire:Object.hasOwn(r,'frontTire')?r.frontTire:'',rearTire:Object.hasOwn(r,'rearTire')?r.rearTire:'',
+ after:{}
+}));
+const SUPREME_IMPORTED_TODOS=[
+ 'Refresh shock','Update clickers','Pads from V4 to V5','Blue pads installed',
+ 'Red brake pads','Springdex','Refresh fork','550lb Spring','Rotate bars back',
+ 'Untwist front brake','Bolt check','Clean','Magic Mary'
+].map((title,i)=>({
+ id:'supreme_imported_todo_'+String(i+1).padStart(2,'0'),bikeId:'supreme',
+ text:title,detail:'Historical To Do entry; completion status has not been verified.',
+ done:false,createdAt:'2026-08-16T12:'+String(i).padStart(2,'0')+':00'
+}));
 
 const baseRides = [
   {id:'seed_20260930',date:'2026-09-30',createdAt:'2026-09-30T12:00:00',location:'Current setup',conditions:'',frontPsi:27,rearPsi:30,forkPsi:99,forkTravel:170,spacers:1,shockPsi:200,hsc:8,lsc:10,hsr:6,lsr:6,shockHsc:4,shockLsc:5,shockHsr:3,shockLsr:11,progression:'HI',notes:'Latest saved Bullit suspension setup. Shock LSC carried forward from Sep 9 because the Sep 30 note is blank.',after:{}},
@@ -147,6 +197,15 @@ async function seedIfNeeded(){
       await put('meta',{key:setupKey(id),value:FIRST_SETUP[id]});
     await put('meta',{key:'bikeMigrationV4',value:true});
   }
+  // v0.4.2: add historical Supreme setup logs and notes once, without touching
+  // a more recent or user-edited Supreme current setup.
+  if(!(await getMeta('supremeArchiveV042'))){
+    const ridesById=new Set((await getAll('rides')).map(r=>r.id));
+    for(const entry of SUPREME_HISTORICAL_SETUPS)if(!ridesById.has(entry.id))await put('rides',entry);
+    const todosById=new Set((await getAll('todos')).map(t=>t.id));
+    for(const entry of SUPREME_IMPORTED_TODOS)if(!todosById.has(entry.id))await put('todos',entry);
+    await put('meta',{key:'supremeArchiveV042',value:true});
+  }
   await put('meta',{key:'appVersion',value:APP_VERSION});
 }
 
@@ -210,7 +269,7 @@ function renderDashboard(){
  $('dashSetupButton').textContent='Edit '+p.label+' setup';
  const open=todos.filter(t=>!t.done).length;
  $('todoCountChip').textContent=open+' to-do'+(open===1?'':'s');
- const last=rides[0]||c,a=last.after||{};
+ const last=rides.find(r=>r.recordType!=='setup')||c,a=last.after||{};
  const afterBits=[a.overall,a.next?'Next: '+a.next:''].filter(Boolean);
  const shockLabel=(last.shockType||p.shockType)==='coil'?
    displayNum(last.springRate)+' lb/in':displayNum(last.shockPsi)+' psi';
@@ -224,7 +283,7 @@ function renderRides(){
     const a=r.after||{};
     const after=afterHasData(a)?`<div class="after-summary"><div class="line"><strong>After ride${a.overall?` · ${esc(a.overall)}`:''}</strong></div>${a.feel?`<div class="line">${esc(a.feel)}</div>`:''}${a.next?`<div class="line"><strong>Next:</strong> ${esc(a.next)}</div>`:''}</div>`:'';
     return `<div class="ride-card">
-      <div class="row"><div><div class="date">${esc(prettyDate(r.date))}</div><div class="meta">${esc(r.location||'Ride')}${r.conditions?` · ${esc(r.conditions)}`:''}</div></div>${i===0?'<span class="status-pill"><span class="status-dot"></span>Latest ride</span>':''}</div>
+      <div class="row"><div><div class="date">${esc(prettyDate(r.date))}</div><div class="meta">${esc(r.location||'Ride')}${r.conditions?` · ${esc(r.conditions)}`:''}</div></div>${r.recordType==='setup'?'<span class="status-pill">Setup notes</span>':i===rides.findIndex(x=>x.recordType!=='setup')?'<span class="status-pill"><span class="status-dot"></span>Latest ride</span>':''}</div>
       <div class="chips"><span class="chip">Fork ${esc(displayNum(r.forkPsi))} psi</span><span class="chip">HSC ${esc(displayNum(r.hsc))}</span><span class="chip">LSR ${esc(displayNum(r.lsr))}</span><span class="chip">Shock ${esc((r.shockType||profile().shockType)==='coil'?displayNum(r.springRate)+' lb/in':displayNum(r.shockPsi)+' psi')}</span><span class="chip">S LSR ${esc(displayNum(r.shockLsr))}</span><span class="chip">${esc(r.progression||'—')}</span></div>
       ${r.notes?`<div class="note">${esc(r.notes)}</div>`:''}${after}
       <div class="ride-actions"><button data-edit-ride="${esc(r.id)}">${afterHasData(a)?'Edit ride':'Add after-ride notes'}</button></div>
@@ -457,7 +516,7 @@ function closeRide(){$('rideModal').classList.remove('open');editingRideId=null;
 async function saveRide(){
   const old=editingRideId?rides.find(r=>r.id===editingRideId):null;
   const r={
-    ...(old||current()),bikeId:activeBike,id:old?.id||uid('ride'),createdAt:old?.createdAt||new Date().toISOString(),
+    ...(old||current()),bikeId:activeBike,recordType:old?.recordType||'ride',id:old?.id||uid('ride'),createdAt:old?.createdAt||new Date().toISOString(),
     date:$('rideDate').value||new Date().toISOString().slice(0,10),location:$('location').value.trim()||'Ride',conditions:$('conditions').value,notes:$('rideNotes').value.trim(),progression:activeBike==='bullit'?progression:$('progressionText').value.trim(),geometry:activeBike==='bullit'?geometry:$('geometryText').value.trim(),frontTire:$('frontTireModel').value.trim(),rearTire:$('rearTireModel').value.trim(),forkSagMm:$('forkSagMm').value.trim()===''?null:Number($('forkSagMm').value),shockSagMm:$('shockSagMm').value.trim()===''?null:Number($('shockSagMm').value),shockStroke:nullableNum($('shockStrokeMm').value),forkModel:$('forkModel').value.trim(),shockModel:$('shockModel').value.trim(),shockType:$('shockType').value,springRate:nullableNum($('shockSpringRate').value),hbo:nullableNum($('shockHbo').value),brakePads:$('brakePads').value.trim(),rotors:$('rotorSpecs').value.trim(),
     frontPsi:fieldNumber('frontPsi'),rearPsi:fieldNumber('rearPsi'),forkPsi:fieldNumber('forkPsi'),forkTravel:nullableNum($('forkTravelMm').value),spacers:nullableNum($('spacersInput').value),shockPsi:fieldNumber('shockPsi'),
     hsc:fieldNumber('hsc'),lsc:fieldNumber('lsc'),hsr:fieldNumber('hsr'),lsr:fieldNumber('lsr'),shockHsc:fieldNumber('shockHsc'),shockLsc:fieldNumber('shockLsc'),shockHsr:fieldNumber('shockHsr'),shockLsr:fieldNumber('shockLsr'),
