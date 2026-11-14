@@ -547,9 +547,26 @@
       <div class="field"><label>Front tire model</label><input type="text" id="frontTireModel" /></div>
        <div class="field"><label>Rear tire model</label><input type="text" id="rearTireModel" /></div>
        <div class="field"><label>Fork PSI</label><div class="stepper" data-target="forkPsi" data-step="1"><button>-</button><div class="stepvalue"><span id="forkPsi">99</span> <small>psi</small></div><button>+</button></div></div>
-      <div class="field"><label>Shock PSI</label><div class="stepper" data-target="shockPsi" data-step="1"><button>-</button><div class="stepvalue"><span id="shockPsi">200</span> <small>psi</small></div><button>+</button></div></div>
+      <div class="field" id="shockPsiField"><label>Shock PSI</label><div class="stepper" data-target="shockPsi" data-step="1"><button>-</button><div class="stepvalue"><span id="shockPsi">200</span> <small>psi</small></div><button>+</button></div></div>
     </div>
 
+    <div class="fieldgrid">
+      <div class="field"><label>Fork model</label><input type="text" id="forkModel" /></div>
+      <div class="field"><label>Rear shock model</label><input type="text" id="shockModel" /></div>
+    </div>
+    <div class="fieldgrid">
+      <div class="field"><label>Fork travel (mm)</label><input type="number" min="0" step="1" id="forkTravelMm" /></div>
+      <div class="field"><label>Shock stroke (mm)</label><input type="number" min="0" step="0.5" id="shockStrokeMm" /></div>
+    </div>
+    <div class="fieldgrid">
+      <div class="field"><label>Rear shock type</label><select id="shockType"><option value="air">Air</option><option value="coil">Coil</option></select></div>
+      <div class="field" id="shockSpringField" style="display:none"><label>Spring (lb/in)</label><input type="number" min="0" step="25" id="shockSpringRate" /></div>
+    </div>
+    <div class="field" id="shockHboField" style="display:none"><label>Hydraulic bottom-out (clicks OUT)</label><input type="number" min="0" step="1" id="shockHbo" /></div>
+    <div class="fieldgrid">
+      <div class="field"><label>Brake pads</label><input type="text" id="brakePads" /></div>
+      <div class="field"><label>Rotors</label><input type="text" id="rotorSpecs" /></div>
+    </div>
     <div class="fieldgrid">
       <div class="field"><label>Fork sag (mm)</label><input type="number" min="0" max="170" step="0.5" inputmode="decimal" id="forkSagMm" placeholder="Not measured" /><div class="data-note">170 mm travel · <strong id="forkSagPct">—</strong> sag</div></div>
       <div class="field"><label>Shock sag (mm)</label><input type="number" min="0" max="65" step="0.5" inputmode="decimal" id="shockSagMm" placeholder="Recheck (was 19 mm)" /><div class="data-note">65 mm stroke · <strong id="shockSagPct">—</strong> sag</div></div>
@@ -572,9 +589,13 @@
       </div>
     </div>
 
-    <div class="fieldgrid">
+    <div class="fieldgrid" id="bullitFlipFields">
       <div class="field"><label>Chainstay geometry</label><div class="seg"><button class="geometry" data-mode="HI">HI</button><button class="geometry active" data-mode="LO">LO</button></div></div>
       <div class="field"><label>Shock progression</label><div class="seg"><button class="progression" data-mode="HI">HI</button><button class="progression active" data-mode="LO">LO</button></div></div>
+    </div>
+    <div class="fieldgrid" id="nonBullitFlipFields" style="display:none">
+      <div class="field"><label>Geometry</label><input type="text" id="geometryText" placeholder="HIGH" /></div>
+      <div class="field"><label>Progression</label><input type="text" id="progressionText" placeholder="LINEAR" /></div>
     </div>
     <div class="field"><label>Before-ride note</label><textarea id="rideNotes" placeholder="What are you testing or changing on this ride?"></textarea></div>
 
