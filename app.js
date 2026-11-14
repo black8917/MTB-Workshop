@@ -1,12 +1,13 @@
 'use strict';
 
-const APP_VERSION = '0.3.0';
+const APP_VERSION = '0.4.0';
 const DB_NAME = 'BikeWorkshopPWA';
 const DB_VERSION = 1;
 let db;
 let rides = [];
 let todos = [];
 let maintenance = [];
+let activeBike = 'bullit';
 let progression = 'LO';
 let geometry = 'LO';
 let setupOverride = null;
@@ -50,6 +51,22 @@ const DEFAULT_CURRENT_SETUP = {
   "notes": "Current setup reported Nov 13. Recheck shock sag after changing pressure to 205 psi and shock progression to LOW.",
   "after": {}
 };
+
+
+const BIKE_PROFILES={
+ bullit:{label:'Bullit',name:'2026 Santa Cruz Bullit',sub:'Bullit 4 · MX 170',size:'Large',fork:'FOX 38 Performance Elite GRIP X2',shock:'2026 FOX FLOAT X2 · X01 tune',forkTravel:170,shockStroke:65,shockType:'air',limits:{hsc:11,lsc:18,hsr:8,lsr:15,shockHsc:9,shockLsc:19,shockHsr:7,shockLsr:16}},
+ nomad:{label:'Nomad',name:'2023 Santa Cruz Nomad V6',sub:'Nomad V6 · Enduro',size:'Unverified',fork:'FOX 38 Performance Elite GRIP X2',shock:'Rear shock model to confirm',forkTravel:180,shockStroke:null,shockType:'air',limits:{hsc:11,lsc:18,hsr:8,lsr:15}},
+ supreme:{label:'Supreme V5',name:'2026 Commencal Supreme DH V5',sub:'Supreme DH V5 · 220 rear',size:'Large (Aug 2026 record)',fork:'2027 FOX 40 Factory GRIP X2',shock:'RockShox Vivid Ultimate DH Coil 250×75',forkTravel:203,shockStroke:75,shockType:'coil',limits:{hsc:11,lsc:18,hsr:9,lsr:16}}
+};
+const FIRST_SETUP={
+ nomad:{bikeId:'nomad',id:'nomad_current',date:'2026-11-14',location:'Current setup',frontPsi:null,rearPsi:null,frontTire:'Not recorded',rearTire:'Not recorded',forkPsi:85,forkTravel:180,spacers:1,forkSagMm:null,shockPsi:null,shockStroke:null,shockSagMm:null,shockType:'air',springRate:null,hbo:null,forkModel:'FOX 38 Performance Elite GRIP X2',shockModel:'Rear shock model to confirm',hsc:6,lsc:10,hsr:5,lsr:6,shockHsc:null,shockLsc:null,shockHsr:null,shockLsr:null,geometry:'Unrecorded',progression:'Unrecorded',notes:'Historical Nomad notes: fork recorded; rear shock, tires and remaining settings need verification.',after:{}},
+ supreme:{bikeId:'supreme',id:'supreme_current',date:'2026-11-14',location:'Current setup',frontPsi:27,rearPsi:30,frontTire:'Model to confirm · CushCore front',rearTire:'Model to confirm',forkPsi:85,forkTravel:203,spacers:2,forkSagMm:null,shockPsi:null,shockStroke:75,shockSagMm:null,shockType:'coil',springRate:550,hbo:3,forkModel:'2027 FOX 40 Factory GRIP X2',shockModel:'RockShox Vivid Ultimate DH Coil 250×75',hsc:5,lsc:9,hsr:8,lsr:9,shockHsc:1,shockLsc:0,shockHsr:null,shockLsr:4,geometry:'HIGH',progression:'LINEAR',notes:'Latest recorded Supreme: 550 lb/in spring supersedes older 500; High/Linear. Earlier ~17% sag requires recheck.',after:{}}
+};
+const profile=()=>BIKE_PROFILES[activeBike];
+const setupKey=(id=activeBike)=>id==='bullit'?'currentSetupV2':'currentSetupV4_'+id;
+const displayNum=v=>Number.isFinite(v)?String(v):'—';
+const nullableNum=v=>v===null||v===''||v===undefined?null:Number(v);
+const fieldNumber=id=>{const t=$(id).textContent.trim();return t==='—'||t===''?null:Number(t);};
 
 const baseRides = [
   {id:'seed_20260930',date:'2026-09-30',createdAt:'2026-09-30T12:00:00',location:'Current setup',conditions:'',frontPsi:27,rearPsi:30,forkPsi:99,forkTravel:170,spacers:1,shockPsi:200,hsc:8,lsc:10,hsr:6,lsr:6,shockHsc:4,shockLsc:5,shockHsr:3,shockLsr:11,progression:'HI',notes:'Latest saved Bullit suspension setup. Shock LSC carried forward from Sep 9 because the Sep 30 note is blank.',after:{}},
@@ -120,19 +137,35 @@ async function seedIfNeeded(){
       await put('todos',{id:'todo_bosch_500008',text:'Investigate Bosch fault 500008',detail:'After downhill coasting, cranks have sometimes spun without moving chainring; intermittent delayed engagement, clunk and whir.',done:false,createdAt:'2026-11-13T22:30:00'});
     await put('meta',{key:'serviceMigrationV2',value:true});
   }
+
+  // Non-destructive v0.4 migration: untagged legacy records belong to Bullit.
+  if(!(await getMeta('bikeMigrationV4'))){
+    for(const store of ['rides','todos','maintenance']){
+      for(const item of await getAll(store))if(!item.bikeId)await put(store,{...item,bikeId:'bullit'});
+    }
+    for(const id of ['nomad','supreme'])if(!(await getMeta(setupKey(id))))
+      await put('meta',{key:setupKey(id),value:FIRST_SETUP[id]});
+    await put('meta',{key:'bikeMigrationV4',value:true});
+  }
   await put('meta',{key:'appVersion',value:APP_VERSION});
 }
 
 function sortRides(arr){return [...arr].sort((a,b)=>String(b.date).localeCompare(String(a.date)) || String(b.createdAt||'').localeCompare(String(a.createdAt||'')));}
 function sortMaintenance(arr){return [...arr].sort((a,b)=>String(b.date).localeCompare(String(a.date)) || String(b.createdAt||'').localeCompare(String(a.createdAt||'')));}
 async function reload(){
-  rides=sortRides(await getAll('rides'));
-  todos=await getAll('todos');
-  maintenance=sortMaintenance(await getAll('maintenance'));
-  setupOverride=await getMeta('currentSetupV2');
+  rides=sortRides((await getAll('rides')).filter(r=>(r.bikeId||'bullit')===activeBike));
+  todos=(await getAll('todos')).filter(t=>(t.bikeId||'bullit')===activeBike);
+  maintenance=sortMaintenance((await getAll('maintenance')).filter(m=>(m.bikeId||'bullit')===activeBike));
+  setupOverride=await getMeta(setupKey());
   renderAll();
 }
-const current=()=>setupOverride||rides[0]||DEFAULT_CURRENT_SETUP;
+const current=()=>setupOverride||rides[0]||(activeBike==='bullit'?DEFAULT_CURRENT_SETUP:FIRST_SETUP[activeBike]);
+async function switchBike(id){
+  if(!BIKE_PROFILES[id]||id===activeBike)return;
+  activeBike=id;await put('meta',{key:'activeBikeV4',value:id});
+  document.querySelectorAll('.bike-tab').forEach(b=>b.classList.toggle('active',b.dataset.bike===id));
+  await reload();go('dashboard');
+}
 function prettyDate(s){if(!s)return '—';const d=new Date(`${s}T12:00:00`);return d.toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'});}
 function shortDate(s){if(!s)return '—';const d=new Date(`${s}T12:00:00`);return d.toLocaleDateString(undefined,{month:'short',day:'numeric'});}
 
@@ -144,38 +177,47 @@ function go(screen){
 }
 
 function renderDashboard(){
-  const c=current();
-  $('dashSavedDate').textContent=shortDate(c.date);
-  $('dashForkPsi').textContent=c.forkPsi;
-  $('dashShockPsi').textContent=c.shockPsi;
-  $('dashFrontPsi').textContent=c.frontPsi;
-  $('dashRearPsi').textContent=c.rearPsi;
-  $('dashFrontTire').textContent=c.frontTire||DEFAULT_CURRENT_SETUP.frontTire;
-  $('dashRearTire').textContent=c.rearTire||DEFAULT_CURRENT_SETUP.rearTire;
-  $('dashGeometry').textContent=c.geometry||'—';
-  $('dashForkSag').textContent=Number.isFinite(c.forkSagMm)?c.forkSagMm+' mm / '+(100*c.forkSagMm/170).toFixed(1)+'%':'Sag not measured';
-  $('dashShockSag').textContent=Number.isFinite(c.shockSagMm)?c.shockSagMm+' mm / '+(100*c.shockSagMm/65).toFixed(1)+'%':'Recheck sag (previously 19 mm)';
-  $('dashHSC').textContent=`${c.hsc} / 11`;
-  $('dashLSC').textContent=`${c.lsc} / 18`;
-  $('dashLSR').textContent=`${c.lsr} / 15`;
-  $('dashHSR').textContent=`${c.hsr} / 8`;
-  $('dashShockHSC').textContent=c.shockHsc ?? '—';
-  $('dashShockLSC').textContent=c.shockLsc ?? '—';
-  $('dashShockHSR').textContent=c.shockHsr ?? '—';
-  $('dashShockLSR').textContent=c.shockLsr ?? '—';
-  $('dashProgression').textContent=c.progression||'—';
-  const open=todos.filter(t=>!t.done).length;
-  $('todoCountChip').textContent=`${open} to-do${open===1?'':'s'}`;
-
-  const last=rides[0]||c;
-  const a=last.after||{};
-  const afterBits=[a.overall,a.next?`Next: ${a.next}`:''].filter(Boolean);
-  $('lastRideCard').innerHTML=`
-    <div class="row"><div><div class="kicker">${esc(prettyDate(last.date))}</div><h3>${esc(last.location||'Saved setup')}</h3></div><div style="font-size:24px">›</div></div>
-    <div class="chips"><span class="chip">Fork ${esc(last.forkPsi)} psi</span><span class="chip">Shock ${esc(last.shockPsi)} psi</span><span class="chip">${esc(last.progression)} progression</span></div>
-    <div class="note" style="margin-top:10px;color:#cfd1d5;font-size:13px">${afterBits.length?esc(afterBits.join(' · ')):'Use this as the starting point for the next ride. Change only what you actually touch.'}</div>`;
+ const c=current(),p=profile(),coil=(c.shockType||p.shockType)==='coil';
+ $('appBikeTitle').textContent=p.name;
+ $('dashBikeTitle').textContent=p.sub;
+ $('dashSavedDate').textContent=shortDate(c.date);
+ $('dashForkDesc').textContent=(c.forkModel||p.fork)+' · '+(c.forkTravel||p.forkTravel)+' mm · '+displayNum(c.spacers)+' spacer';
+ $('dashShockDesc').textContent=c.shockModel||p.shock;
+ $('dashShockLabel').textContent=coil?'Spring':'Shock';
+ $('dashShockUnit').textContent=coil?'lb/in':'psi';
+ $('dashForkPsi').textContent=displayNum(c.forkPsi);
+ $('dashShockPsi').textContent=coil?displayNum(c.springRate):displayNum(c.shockPsi);
+ $('dashFrontPsi').textContent=displayNum(c.frontPsi);
+ $('dashRearPsi').textContent=displayNum(c.rearPsi);
+ $('dashFrontTire').textContent=c.frontTire||'Unrecorded';
+ $('dashRearTire').textContent=c.rearTire||'Unrecorded';
+ $('dashGeometry').textContent=c.geometry||'—';
+ $('dashForkSag').textContent=Number.isFinite(c.forkSagMm)&&c.forkTravel?c.forkSagMm+' mm / '+(100*c.forkSagMm/c.forkTravel).toFixed(1)+'%':'Sag not measured';
+ $('dashShockSag').textContent=Number.isFinite(c.shockSagMm)&&c.shockStroke?c.shockSagMm+' mm / '+(100*c.shockSagMm/c.shockStroke).toFixed(1)+'%':'Sag not measured';
+ for(const [id,key] of [['dashHSC','hsc'],['dashLSC','lsc'],['dashHSR','hsr'],['dashLSR','lsr'],
+  ['dashShockHSC','shockHsc'],['dashShockLSC','shockLsc'],['dashShockHSR','shockHsr'],['dashShockLSR','shockLsr']]){
+   $(id).textContent=displayNum(c[key]);
+ }
+ for(const [id,key] of [['dashFMax','hsc'],['dashFlMax','lsc'],['dashFrMax','hsr'],['dashFlrMax','lsr']]){
+   $(id).textContent='/ '+(p.limits[key]??'—');
+ }
+ $('dashProgression').textContent=c.progression||'—';
+ $('dashHBO').textContent=coil?'HBO '+displayNum(c.hbo):'';
+ $('dashHBO').style.display=coil?'':'none';
+ $('dashBrakePads').textContent=c.brakePads||(activeBike==='bullit'?'TRP red semi-metallic':'Unrecorded');
+ $('dashRotorSize').textContent=c.rotors||(activeBike==='bullit'?'TRP 223 / 223 mm':'Unrecorded');
+ $('dashHub').textContent=activeBike==='bullit'?'20° last confirmed':'Unrecorded';
+ $('dashSetupButton').textContent='Edit '+p.label+' setup';
+ const open=todos.filter(t=>!t.done).length;
+ $('todoCountChip').textContent=open+' to-do'+(open===1?'':'s');
+ const last=rides[0]||c,a=last.after||{};
+ const afterBits=[a.overall,a.next?'Next: '+a.next:''].filter(Boolean);
+ const shockLabel=(last.shockType||p.shockType)==='coil'?
+   displayNum(last.springRate)+' lb/in':displayNum(last.shockPsi)+' psi';
+ $('lastRideCard').innerHTML='<div class="row"><div><div class="kicker">'+esc(prettyDate(last.date))+'</div><h3>'+esc(last.location||'Saved setup')+'</h3></div><div style="font-size:24px">›</div></div>'+
+   '<div class="chips"><span class="chip">Fork '+esc(displayNum(last.forkPsi))+' psi</span><span class="chip">Shock '+esc(shockLabel)+'</span><span class="chip">'+esc(last.progression||'—')+'</span></div>'+
+   '<div class="note" style="margin-top:10px;color:#cfd1d5;font-size:13px">'+(afterBits.length?esc(afterBits.join(' · ')):'Use this as the starting point for the next ride.')+'</div>';
 }
-
 function afterHasData(a={}){return !!(a.overall||a.bottom||a.forkTravel||a.shockTravel||a.feel||a.worked||a.didnt||a.next||a.notes);}
 function renderRides(){
   $('rideList').innerHTML=rides.map((r,i)=>{
@@ -183,7 +225,7 @@ function renderRides(){
     const after=afterHasData(a)?`<div class="after-summary"><div class="line"><strong>After ride${a.overall?` · ${esc(a.overall)}`:''}</strong></div>${a.feel?`<div class="line">${esc(a.feel)}</div>`:''}${a.next?`<div class="line"><strong>Next:</strong> ${esc(a.next)}</div>`:''}</div>`:'';
     return `<div class="ride-card">
       <div class="row"><div><div class="date">${esc(prettyDate(r.date))}</div><div class="meta">${esc(r.location||'Ride')}${r.conditions?` · ${esc(r.conditions)}`:''}</div></div>${i===0?'<span class="status-pill"><span class="status-dot"></span>Latest ride</span>':''}</div>
-      <div class="chips"><span class="chip">Fork ${esc(r.forkPsi)} psi</span><span class="chip">HSC ${esc(r.hsc)}/11</span><span class="chip">LSR ${esc(r.lsr)}/15</span><span class="chip">Shock ${esc(r.shockPsi)} psi</span><span class="chip">S LSR ${esc(r.shockLsr ?? '—')}</span><span class="chip">${esc(r.progression)}</span></div>
+      <div class="chips"><span class="chip">Fork ${esc(displayNum(r.forkPsi))} psi</span><span class="chip">HSC ${esc(displayNum(r.hsc))}</span><span class="chip">LSR ${esc(displayNum(r.lsr))}</span><span class="chip">Shock ${esc((r.shockType||profile().shockType)==='coil'?displayNum(r.springRate)+' lb/in':displayNum(r.shockPsi)+' psi')}</span><span class="chip">S LSR ${esc(displayNum(r.shockLsr))}</span><span class="chip">${esc(r.progression||'—')}</span></div>
       ${r.notes?`<div class="note">${esc(r.notes)}</div>`:''}${after}
       <div class="ride-actions"><button data-edit-ride="${esc(r.id)}">${afterHasData(a)?'Edit ride':'Add after-ride notes'}</button></div>
     </div>`;
@@ -242,6 +284,7 @@ function comparisonRangeRow(label,y,range,max,note,maxLabel=''){
   return '<div class="compare-row"><div class="compare-top"><div class="setting">'+esc(label)+'</div><div class="your">'+esc(y+maxLabel)+'</div><div class="base">'+esc(lo+'–'+hi+maxLabel)+'</div><div class="delta '+color+'">'+esc(delta===0?'0':(delta>0?'+':'')+delta)+'</div></div><div class="barwrap"><div class="barfill" style="width:'+pos(y,max)+'%"></div><div class="baseline" style="left:'+pos(mid,max)+'%"></div><div class="mine-dot" style="left:'+pos(y,max)+'%"></div></div><div class="row-note">'+esc(note)+'</div></div>';
 }
 function renderSetup(){
+  if(activeBike!=='bullit'){renderOtherBikeSetup();return;}
   const c=current(),f=forkBaseline[baseline],s=shockBaseline[baseline];
   const sc=baseline==='sc',fox=sc?null:foxX2Baseline(Number(c.shockPsi));
   const clicks='All click counts OUT from fully clockwise closed. Positive compression Δ = softer; positive rebound Δ = faster.';
@@ -273,6 +316,56 @@ function renderSetup(){
     comparisonRow('HSR',c.shockHsr,sc?s.hsr:(fox?.hsr??null),7,(sc?'Santa Cruz X01. ':foxRange)+clicks,'','/7')+
     comparisonRow('LSR',c.shockLsr,sc?s.lsr:(fox?.lsr??null),16,(sc?'Santa Cruz X01. ':foxRange)+clicks,'','/16');
 }
+function otherRow(label,value,note){
+ return '<div class="compare-row"><div class="compare-top"><div class="setting">'+esc(label)+'</div><div class="your">'+esc(value)+'</div><div class="base">—</div><div class="delta neutral">—</div></div><div class="row-note">'+esc(note)+'</div></div>';
+}
+function renderOtherBikeSetup(){
+ const c=current(),p=profile(),stroke=c.shockStroke||p.shockStroke;
+ $('suspensionReference').textContent=p.name+' · Current settings only. Manufacturer baseline not yet verified; never reuse Bullit-specific pressure, damping or torque values.';
+ $('forkRows').innerHTML=[
+  otherRow('Air pressure',displayNum(c.forkPsi)+' psi',c.forkModel||p.fork),
+  otherRow('Sag',Number.isFinite(c.forkSagMm)&&c.forkTravel?c.forkSagMm+' mm / '+(100*c.forkSagMm/c.forkTravel).toFixed(1)+'%':'Not measured',(c.forkTravel||p.forkTravel)+' mm travel'),
+  ...[['HSC',c.hsc],['LSC',c.lsc],['HSR',c.hsr],['LSR',c.lsr]].map(([k,v])=>otherRow(k,displayNum(v)+' out','Clicks OUT from fully closed'))
+ ].join('');
+ $('shockRows').innerHTML=[
+  otherRow((c.shockType||p.shockType)==='coil'?'Spring rate':'Air pressure',(c.shockType||p.shockType)==='coil'?displayNum(c.springRate)+' lb/in':displayNum(c.shockPsi)+' psi',c.shockModel||p.shock),
+  otherRow('Sag',Number.isFinite(c.shockSagMm)&&stroke?c.shockSagMm+' mm / '+(100*c.shockSagMm/stroke).toFixed(1)+'%':'Not measured',stroke?stroke+' mm stroke':'Enter shock stroke'),
+  ...[['HSC',c.shockHsc],['LSC',c.shockLsc],['HSR',c.shockHsr],['LSR',c.shockLsr]].map(([k,v])=>otherRow(k,displayNum(v)+' out','Clicks OUT from fully closed')),
+  ...((c.shockType||p.shockType)==='coil'?[otherRow('HBO',displayNum(c.hbo)+' out','Hydraulic bottom-out')]:[]),
+  otherRow('Geometry',c.geometry||'—','Current frame configuration'),
+  otherRow('Progression',c.progression||'—','Current suspension configuration')
+ ].join('');
+}
+function renderProfileSpecs(){
+ const bullit=activeBike==='bullit',c=current(),p=profile();
+ $('baselineSelector').style.display=bullit?'':'none';
+ $('setupForkDesc').textContent=(c.forkModel||p.fork)+' · '+(c.forkTravel||p.forkTravel)+' mm';
+ $('setupShockDesc').textContent=c.shockModel||p.shock;
+ for(const el of document.querySelectorAll('#setup .assessment, #setup .tiny, #spec-components > details.component-detail')){
+   el.style.display=bullit?'':'none';
+ }
+ for(const id of ['bullitFactoryTitle','bullitFrameTitle','bullitTorqueSearch','bullitBuildCard','bullitFactoryCard','bullitGeometryCard','bullitFrameFacts','torqueList']){
+   const el=$(id);if(el)el.style.display=bullit?'':'none';
+ }
+ for(const id of ['otherBikeBuild','otherBikeGeometry','otherBikeTorque','otherBikeComponents']){
+   const el=$(id);if(el)el.style.display=bullit?'none':'';
+ }
+ if(bullit)return;
+ const rows=[
+  ['Bike',p.name],['Recorded size',p.size],
+  ['Fork',c.forkModel||p.fork],['Fork travel',displayNum(c.forkTravel||p.forkTravel)+' mm'],
+  ['Rear shock',c.shockModel||p.shock],['Shock stroke',c.shockStroke?c.shockStroke+' mm':'Unrecorded'],
+  ['Shock type',c.shockType||p.shockType],['Coil spring',(c.shockType||p.shockType)==='coil'?displayNum(c.springRate)+' lb/in':'N/A'],
+  ['Front tire',c.frontTire||'Unrecorded'],['Rear tire',c.rearTire||'Unrecorded'],
+  ['Brakes',c.brakePads||'Unrecorded'],['Rotors',c.rotors||'Unrecorded'],
+  ['Geometry',c.geometry||'Unrecorded'],['Progression',c.progression||'Unrecorded']
+ ];
+ $('otherBikeBuild').innerHTML='<div class="card"><h3>'+esc(p.name)+'</h3><div class="spec-list">'+rows.map(([name,val])=>'<div class="spec-row"><span>'+esc(name)+'</span><strong>'+esc(val)+'</strong></div>').join('')+'</div><div class="data-note">These are previously recorded settings. Verify any uncertain components before relying on them.</div></div>';
+ $('otherBikeGeometry').innerHTML='<div class="card"><h3>'+esc(p.label)+' geometry</h3><div class="spec-row"><span>Current geometry</span><strong>'+esc(c.geometry||'Unrecorded')+'</strong></div><div class="spec-row"><span>Progression</span><strong>'+esc(c.progression||'Unrecorded')+'</strong></div><div class="data-note">Manufacturer geometry reference pending verification.</div></div>';
+ $('otherBikeTorque').innerHTML='<div class="card"><h3>Torque specs</h3><div class="data-note">Not yet verified for '+esc(p.label)+'. Bullit-specific torque values are hidden.</div></div>';
+ $('otherBikeComponents').innerHTML='<div class="card"><h3>Components</h3><div class="spec-row"><span>Fork</span><strong>'+esc(c.forkModel||p.fork)+'</strong></div><div class="spec-row"><span>Rear shock</span><strong>'+esc(c.shockModel||p.shock)+'</strong></div><div class="data-note">Use Edit current setup on the dashboard to update components, then log work under Service.</div></div>';
+}
+
 function renderTodos(){
   const sorted=[...todos].sort((a,b)=>Number(a.done)-Number(b.done)||String(b.createdAt||'').localeCompare(String(a.createdAt||'')));
   const open=sorted.filter(t=>!t.done).length;
@@ -284,25 +377,39 @@ function renderTodos(){
 function renderMaintenance(){
   $('maintenanceList').innerHTML=maintenance.map(m=>`<div class="ride-card"><div class="row"><div><div class="date">${esc(prettyDate(m.date))}</div><div class="meta">${esc(m.category||'Maintenance')}</div></div></div><div class="note">${esc(m.note)}</div></div>`).join('')||'<div class="empty">No maintenance entries yet.</div>';
 }
-function renderAll(){renderDashboard();renderRides();renderSetup();renderTodos();renderMaintenance();}
+function renderAll(){renderDashboard();renderRides();renderSetup();renderTodos();renderMaintenance();renderProfileSpecs();}
 
 function clearRideForm(){
   ['afterOverall','afterBottom','afterForkTravel','afterShockTravel','afterFeel','afterWorked','afterDidnt','afterNext','afterNotes'].forEach(id=>{const el=$(id);if(el)el.value='';});
 }
-function setStep(id,v){$(id).textContent=(v??0);}
+function setStep(id,v){$(id).textContent=displayNum(v);}
 function fillRideForm(r){
   $('rideDate').value=r.date||new Date().toISOString().slice(0,10);
   $('location').value=r.location==='Current setup'||r.location==='Setup log'?'':(r.location||'');
   $('conditions').value=r.conditions||'Dry';
   $('rideNotes').value=r.notes||'';
   setStep('frontPsi',r.frontPsi);setStep('rearPsi',r.rearPsi);setStep('forkPsi',r.forkPsi);setStep('shockPsi',r.shockPsi);
-  $('frontTireModel').value=r.frontTire||DEFAULT_CURRENT_SETUP.frontTire;
-  $('rearTireModel').value=r.rearTire||DEFAULT_CURRENT_SETUP.rearTire;
+  $('frontTireModel').value=r.frontTire||'';
+  $('rearTireModel').value=r.rearTire||'';
+  $('forkModel').value=r.forkModel||profile().fork;
+  $('shockModel').value=r.shockModel||profile().shock;
+  $('shockType').value=r.shockType||profile().shockType;
+  $('shockSpringRate').value=Number.isFinite(r.springRate)?r.springRate:'';
+  $('shockHbo').value=Number.isFinite(r.hbo)?r.hbo:'';
+  $('forkTravelMm').value=r.forkTravel||profile().forkTravel||'';
+  $('shockStrokeMm').value=r.shockStroke||profile().shockStroke||'';
+  $('brakePads').value=r.brakePads||(activeBike==='bullit'?'TRP red semi-metallic':'');
+  $('rotorSpecs').value=r.rotors||(activeBike==='bullit'?'TRP 223 / 223 mm':'');
+  $('geometryText').value=r.geometry||'';
+  $('progressionText').value=r.progression||'';
+  $('nonBullitFlipFields').style.display=activeBike==='bullit'?'none':'';
+  $('bullitFlipFields').style.display=activeBike==='bullit'?'':'none';
+  updateShockTypeUI();
   $('forkSagMm').value=Number.isFinite(r.forkSagMm)?r.forkSagMm:'';
   $('shockSagMm').value=Number.isFinite(r.shockSagMm)?r.shockSagMm:'';
   updateSagDisplay();
   setStep('hsc',r.hsc);setStep('lsc',r.lsc);setStep('hsr',r.hsr);setStep('lsr',r.lsr);
-  setStep('shockHsc',r.shockHsc??4);setStep('shockLsc',r.shockLsc??5);setStep('shockHsr',r.shockHsr??3);setStep('shockLsr',r.shockLsr??11);
+  setStep('shockHsc',r.shockHsc);setStep('shockLsc',r.shockLsc);setStep('shockHsr',r.shockHsr);setStep('shockLsr',r.shockLsr);
   progression=r.progression||'LO';
   geometry=r.geometry||'LO';
   document.querySelectorAll('.progression').forEach(x=>x.classList.toggle('active',x.dataset.mode===progression));
@@ -312,15 +419,21 @@ function fillRideForm(r){
   $('afterOverall').value=a.overall||'';$('afterBottom').value=a.bottom||'';$('afterForkTravel').value=a.forkTravel||'';$('afterShockTravel').value=a.shockTravel||'';$('afterFeel').value=a.feel||'';$('afterWorked').value=a.worked||'';$('afterDidnt').value=a.didnt||'';$('afterNext').value=a.next||'';$('afterNotes').value=a.notes||'';
   $('afterRideBlock').open=afterHasData(a);
 }
+function updateShockTypeUI(){
+ const coil=$('shockType').value==='coil';
+ $('shockSpringField').style.display=coil?'':'none';
+ $('shockHboField').style.display=coil?'':'none';
+ $('shockPsiField').style.display=coil?'none':'';
+}
 function updateSagDisplay(){
-  for(const [field,out,stroke] of [['forkSagMm','forkSagPct',170],['shockSagMm','shockSagPct',65]]){
+  for(const [field,out,stroke] of [['forkSagMm','forkSagPct',Number($('forkTravelMm').value)],['shockSagMm','shockSagPct',Number($('shockStrokeMm').value)]]){
     const v=$(field).value.trim();
-    $(out).textContent=v!=='' && Number.isFinite(Number(v)) ? (100*Number(v)/stroke).toFixed(1)+'%' : '—';
+    $(out).textContent=v!=='' && Number.isFinite(Number(v)) && stroke>0 ? (100*Number(v)/stroke).toFixed(1)+'%' : '—';
   }
 }
 function openCurrentSetup(){
   editingSetup=true;editingRideId=null;fillRideForm(current());
-  document.querySelector('#rideModal h2').textContent='Edit current setup';
+  document.querySelector('#rideModal h2').textContent='Edit '+profile().label+' setup';
   document.querySelector('#rideModal .subhead').textContent='Save settings without adding a ride to your history.';
   $('saveRide').textContent='Save setup';
   $('rideModal').classList.add('open');
@@ -339,18 +452,18 @@ function closeRide(){$('rideModal').classList.remove('open');editingRideId=null;
 async function saveRide(){
   const old=editingRideId?rides.find(r=>r.id===editingRideId):null;
   const r={
-    ...(old||current()),id:old?.id||uid('ride'),createdAt:old?.createdAt||new Date().toISOString(),
-    date:$('rideDate').value||new Date().toISOString().slice(0,10),location:$('location').value.trim()||'Ride',conditions:$('conditions').value,notes:$('rideNotes').value.trim(),progression,geometry,frontTire:$('frontTireModel').value.trim(),rearTire:$('rearTireModel').value.trim(),forkSagMm:$('forkSagMm').value.trim()===''?null:Number($('forkSagMm').value),shockSagMm:$('shockSagMm').value.trim()===''?null:Number($('shockSagMm').value),shockStroke:65,
-    frontPsi:Number($('frontPsi').textContent),rearPsi:Number($('rearPsi').textContent),forkPsi:Number($('forkPsi').textContent),forkTravel:old?.forkTravel||170,spacers:old?.spacers??1,shockPsi:Number($('shockPsi').textContent),
-    hsc:Number($('hsc').textContent),lsc:Number($('lsc').textContent),hsr:Number($('hsr').textContent),lsr:Number($('lsr').textContent),shockHsc:Number($('shockHsc').textContent),shockLsc:Number($('shockLsc').textContent),shockHsr:Number($('shockHsr').textContent),shockLsr:Number($('shockLsr').textContent),
+    ...(old||current()),bikeId:activeBike,id:old?.id||uid('ride'),createdAt:old?.createdAt||new Date().toISOString(),
+    date:$('rideDate').value||new Date().toISOString().slice(0,10),location:$('location').value.trim()||'Ride',conditions:$('conditions').value,notes:$('rideNotes').value.trim(),progression:activeBike==='bullit'?progression:$('progressionText').value.trim(),geometry:activeBike==='bullit'?geometry:$('geometryText').value.trim(),frontTire:$('frontTireModel').value.trim(),rearTire:$('rearTireModel').value.trim(),forkSagMm:$('forkSagMm').value.trim()===''?null:Number($('forkSagMm').value),shockSagMm:$('shockSagMm').value.trim()===''?null:Number($('shockSagMm').value),shockStroke:nullableNum($('shockStrokeMm').value),forkModel:$('forkModel').value.trim(),shockModel:$('shockModel').value.trim(),shockType:$('shockType').value,springRate:nullableNum($('shockSpringRate').value),hbo:nullableNum($('shockHbo').value),brakePads:$('brakePads').value.trim(),rotors:$('rotorSpecs').value.trim(),
+    frontPsi:fieldNumber('frontPsi'),rearPsi:fieldNumber('rearPsi'),forkPsi:fieldNumber('forkPsi'),forkTravel:nullableNum($('forkTravelMm').value),spacers:old?.spacers??1,shockPsi:fieldNumber('shockPsi'),
+    hsc:fieldNumber('hsc'),lsc:fieldNumber('lsc'),hsr:fieldNumber('hsr'),lsr:fieldNumber('lsr'),shockHsc:fieldNumber('shockHsc'),shockLsc:fieldNumber('shockLsc'),shockHsr:fieldNumber('shockHsr'),shockLsr:fieldNumber('shockLsr'),
     after:{overall:$('afterOverall').value,bottom:$('afterBottom').value,forkTravel:$('afterForkTravel').value.trim(),shockTravel:$('afterShockTravel').value.trim(),feel:$('afterFeel').value.trim(),worked:$('afterWorked').value.trim(),didnt:$('afterDidnt').value.trim(),next:$('afterNext').value.trim(),notes:$('afterNotes').value.trim()}
   };
   if(editingSetup){
-    const updated={...r,id:'bullit_current_user',date:new Date().toISOString().slice(0,10),createdAt:new Date().toISOString(),location:'Current setup',after:{}};
-    await put('meta',{key:'currentSetupV2',value:updated});
+    const updated={...r,id:activeBike+'_current_user',date:new Date().toISOString().slice(0,10),createdAt:new Date().toISOString(),location:'Current setup',after:{}};
+    await put('meta',{key:setupKey(),value:updated});
   }else{
     await put('rides',r);
-    if(r.date>=current().date)await put('meta',{key:'currentSetupV2',value:r});
+    if(r.date>=current().date)await put('meta',{key:setupKey(),value:r});
   }
   closeRide();await reload();go('dashboard');
 }
@@ -359,7 +472,7 @@ function openSimple(mode){
   simpleMode=mode;
   const fields=$('simpleFields');
   if(mode==='todo'){
-    $('simpleTitle').textContent='Add to-do';$('simpleSub').textContent='Keep workshop tasks attached to the Bullit.';
+    $('simpleTitle').textContent='Add to-do';$('simpleSub').textContent='Keep workshop tasks attached to the selected bike.';
     fields.innerHTML='<div class="field"><label>Task</label><input id="simpleText" type="text" placeholder="e.g. Recheck rear axle" /></div><div class="field"><label>Detail</label><textarea id="simpleDetail" placeholder="Optional note"></textarea></div>';
   }else{
     $('simpleTitle').textContent='Add maintenance';$('simpleSub').textContent='Record what you changed or serviced.';
@@ -372,45 +485,59 @@ function closeSimple(){$('simpleModal').classList.remove('open');simpleMode=null
 async function saveSimple(){
   if(simpleMode==='todo'){
     const text=$('simpleText').value.trim();if(!text)return;
-    await put('todos',{id:uid('todo'),text,detail:$('simpleDetail').value.trim(),done:false,createdAt:new Date().toISOString()});
+    await put('todos',{id:uid('todo'),bikeId:activeBike,text,detail:$('simpleDetail').value.trim(),done:false,createdAt:new Date().toISOString()});
   }else if(simpleMode==='maintenance'){
     const note=$('simpleNote').value.trim();if(!note)return;
-    await put('maintenance',{id:uid('maint'),date:$('simpleDate').value||new Date().toISOString().slice(0,10),category:$('simpleCategory').value.trim()||'Maintenance',note,createdAt:new Date().toISOString()});
+    await put('maintenance',{id:uid('maint'),bikeId:activeBike,date:$('simpleDate').value||new Date().toISOString().slice(0,10),category:$('simpleCategory').value.trim()||'Maintenance',note,createdAt:new Date().toISOString()});
   }
   closeSimple();await reload();
 }
 
 async function exportBackup(){
-  const payload={format:'bike-workshop-pwa',version:APP_VERSION,exportedAt:new Date().toISOString(),bike:'2026 Santa Cruz Bullit GX Large',currentSetup:current(),rides:await getAll('rides'),todos:await getAll('todos'),maintenance:await getAll('maintenance')};
+  const payload={format:'bike-workshop-pwa',version:APP_VERSION,exportedAt:new Date().toISOString(),bike:'all',activeBike,currentSetups:{bullit:await getMeta(setupKey('bullit')),nomad:await getMeta(setupKey('nomad')),supreme:await getMeta(setupKey('supreme'))},rides:await getAll('rides'),todos:await getAll('todos'),maintenance:await getAll('maintenance')};
   const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
-  const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=`bike-workshop-bullit-${new Date().toISOString().slice(0,10)}.json`;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
+  const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=`bike-workshop-all-bikes-${new Date().toISOString().slice(0,10)}.json`;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
 async function importBackup(file){
   const text=await file.text();
   let payload;try{payload=JSON.parse(text);}catch(_){alert('That file is not valid JSON.');return;}
   if(!payload||!Array.isArray(payload.rides)){alert('This does not look like a Bike Workshop backup.');return;}
-  if(!confirm('Replace the local Bike Workshop data on this device with this backup?'))return;
-  for(const store of ['rides','todos','maintenance'])await clearStore(store);
-  for(const r of payload.rides||[])await put('rides',{...r,id:r.id||uid('ride')});
-  for(const t of payload.todos||[])await put('todos',{...t,id:t.id||uid('todo')});
-  for(const m of payload.maintenance||[])await put('maintenance',{...m,id:m.id||uid('maint')});
-  await put('meta',{key:'currentSetupV2',value:payload.currentSetup||sortRides(payload.rides)[0]||DEFAULT_CURRENT_SETUP});
+  const modern=!!payload.currentSetups;
+  const message=modern?'Replace ALL THREE bikes and their local rides, service and settings with this backup?':'Older Bullit-only backup. Replace only Bullit records and leave other bikes unchanged?';
+  if(!confirm(message))return;
+  if(modern){
+    for(const store of ['rides','todos','maintenance'])await clearStore(store);
+    for(const [id,c] of Object.entries(payload.currentSetups))if(BIKE_PROFILES[id]&&c)await put('meta',{key:setupKey(id),value:c});
+  }else{
+    for(const store of ['rides','todos','maintenance']){
+      for(const item of await getAll(store))if((item.bikeId||'bullit')==='bullit')await del(store,item.id);
+    }
+    await put('meta',{key:setupKey('bullit'),value:payload.currentSetup||sortRides(payload.rides)[0]||DEFAULT_CURRENT_SETUP});
+  }
+  for(const r of payload.rides||[])await put('rides',{...r,bikeId:r.bikeId||'bullit',id:r.id||uid('ride')});
+  for(const t of payload.todos||[])await put('todos',{...t,bikeId:t.bikeId||'bullit',id:t.id||uid('todo')});
+  for(const m of payload.maintenance||[])await put('maintenance',{...m,bikeId:m.bikeId||'bullit',id:m.id||uid('maint')});
+  activeBike=modern&&BIKE_PROFILES[payload.activeBike]?payload.activeBike:'bullit';
+  document.querySelectorAll('.bike-tab').forEach(b=>b.classList.toggle('active',b.dataset.bike===activeBike));
+  await put('meta',{key:'activeBikeV4',value:activeBike});
   await reload();alert('Backup imported.');
 }
 
 function wireEvents(){
+  document.querySelectorAll('.bike-tab').forEach(b=>b.onclick=()=>switchBike(b.dataset.bike));
   document.querySelectorAll('.navbtn').forEach(b=>b.onclick=()=>go(b.dataset.screen));
   document.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>go(b.dataset.go));
   [$('headerAdd'),$('newRideMain'),$('newRideRides'),$('fab')].forEach(b=>b&&(b.onclick=()=>openRide()));
   $('editCurrentSetup').onclick=openCurrentSetup;
   $('forkSagMm').oninput=updateSagDisplay;$('shockSagMm').oninput=updateSagDisplay;
+  $('forkTravelMm').oninput=updateSagDisplay;$('shockStrokeMm').oninput=updateSagDisplay;$('shockType').onchange=updateShockTypeUI;
   document.querySelectorAll('.geometry').forEach(b=>b.onclick=()=>{geometry=b.dataset.mode;document.querySelectorAll('.geometry').forEach(x=>x.classList.toggle('active',x===b));});
   $('cancelRide').onclick=closeRide;$('saveRide').onclick=saveRide;$('rideModal').onclick=e=>{if(e.target===$('rideModal'))closeRide();};
   document.querySelectorAll('.progression').forEach(b=>b.onclick=()=>{progression=b.dataset.mode;document.querySelectorAll('.progression').forEach(x=>x.classList.toggle('active',x===b));});
   document.querySelectorAll('.stepper').forEach(s=>{
     const [minus,,plus]=s.children,id=s.dataset.target,step=Number(s.dataset.step||1);
-    const limits={hsc:[0,11],lsc:[0,18],hsr:[0,8],lsr:[0,15],frontPsi:[0,60],rearPsi:[0,60],forkPsi:[0,140],shockPsi:[0,350],shockHsc:[0,9],shockLsc:[0,19],shockHsr:[0,7],shockLsr:[0,16]};
-    const change=dir=>{const el=$(id);let v=Number(el.textContent);v+=dir*step;const [min,max]=limits[id]||[0,999];v=Math.max(min,Math.min(max,v));el.textContent=Number.isInteger(v)?v:v.toFixed(1);};
+    const p=profile();const limits={hsc:[0,p.limits.hsc??20],lsc:[0,p.limits.lsc??30],hsr:[0,p.limits.hsr??20],lsr:[0,p.limits.lsr??30],frontPsi:[0,60],rearPsi:[0,60],forkPsi:[0,200],shockPsi:[0,350],shockHsc:[0,p.limits.shockHsc??30],shockLsc:[0,p.limits.shockLsc??30],shockHsr:[0,p.limits.shockHsr??30],shockLsr:[0,p.limits.shockLsr??30]};
+    const change=dir=>{const el=$(id);let v=Number(el.textContent);if(!Number.isFinite(v))v=0;v+=dir*step;const [min,max]=limits[id]||[0,999];v=Math.max(min,Math.min(max,v));el.textContent=Number.isInteger(v)?v:v.toFixed(1);};
     minus.onclick=e=>{e.preventDefault();change(-1);};plus.onclick=e=>{e.preventDefault();change(1);};
   });
   document.querySelectorAll('.baseline-btn').forEach(b=>b.onclick=()=>{baseline=b.dataset.baseline;document.querySelectorAll('.baseline-btn').forEach(x=>x.classList.toggle('active',x===b));renderSetup();});
@@ -422,7 +549,7 @@ function wireEvents(){
 
 async function init(){
   try{
-    db=await openDB();await seedIfNeeded();wireEvents();await reload();
+    db=await openDB();await seedIfNeeded();wireEvents();activeBike=(await getMeta('activeBikeV4'))||'bullit';if(!BIKE_PROFILES[activeBike])activeBike='bullit';document.querySelectorAll('.bike-tab').forEach(b=>b.classList.toggle('active',b.dataset.bike===activeBike));await reload();
   }catch(err){console.error(err);alert('Bike Workshop could not open local storage. Try reloading the page.');}
   if('serviceWorker' in navigator){navigator.serviceWorker.register('./sw.js').catch(err=>console.warn('Service worker registration failed',err));}
 }
