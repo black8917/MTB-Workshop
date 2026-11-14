@@ -149,7 +149,7 @@
   .grab{width:42px;height:5px;border-radius:999px;background:#454a52;margin:0 auto 14px}
   .sheet h2{margin:0 0 3px;font-size:23px}.sheet .subhead{color:var(--muted);font-size:12px;margin-bottom:16px}
   .field{margin-bottom:14px}.field label{display:block;font-size:11px;color:var(--muted);font-weight:800;text-transform:uppercase;letter-spacing:.05em;margin-bottom:7px}
-  input[type=text], input[type=date], textarea, select{width:100%;border:1px solid #32363d;background:#1b1e22;color:white;border-radius:12px;padding:12px;outline:none}
+  input[type=text], input[type=number], input[type=date], textarea, select{width:100%;border:1px solid #32363d;background:#1b1e22;color:white;border-radius:12px;padding:12px;outline:none}
   textarea{min-height:82px;resize:vertical}
   .stepper{display:grid;grid-template-columns:44px 1fr 44px;align-items:center;border:1px solid #32363d;border-radius:12px;overflow:hidden;background:#1b1e22}
   .stepper button{height:46px;border:0;background:#25292e;color:white;font-size:24px;font-weight:400}.stepper .stepvalue{text-align:center;font-size:18px;font-weight:850;font-variant-numeric:tabular-nums}.stepper .stepvalue small{font-size:11px;color:var(--muted);font-weight:700}
@@ -222,7 +222,7 @@
               <div><div class="label">Fork</div><div class="value"><span id="dashForkPsi">99</span><span class="unit">psi</span></div></div>
               <span class="status-pill"><span class="status-dot"></span>Saved</span>
             </div>
-            <div class="sub">FOX 38 GRIP X2 · 170 mm · 1 spacer</div>
+            <div class="sub">FOX 38 GRIP X2 · 170 mm · 1 spacer</div><div class="sub" id="dashForkSag">Sag not measured</div>
             <div class="damping-grid">
               <div class="damping-item"><span>HSC</span><strong id="dashHSC">8 / 11</strong></div>
               <div class="damping-item"><span>LSC</span><strong id="dashLSC">10 / 18</strong></div>
@@ -236,7 +236,7 @@
               <div><div class="label">Shock</div><div class="value"><span id="dashShockPsi">200</span><span class="unit">psi</span></div></div>
               <span class="chip" id="dashProgression">HI</span>
             </div>
-            <div class="sub">2026 FOX FLOAT X2 · 205×65 · Bullit tune</div>
+            <div class="sub">2026 FOX FLOAT X2 · 205×65 · Bullit tune</div><div class="sub" id="dashShockSag">Recheck sag</div>
             <div class="damping-grid">
               <div class="damping-item"><span>HSC</span><strong id="dashShockHSC">4</strong></div>
               <div class="damping-item"><span>LSC</span><strong id="dashShockLSC">5</strong></div>
@@ -248,22 +248,22 @@
           <div class="setup-summary wide">
             <div class="label">Tires</div>
             <div class="split-metrics">
-              <div class="split-metric"><div class="sub">Front · Magic Mary Radial</div><div class="value"><span id="dashFrontPsi">27</span><span class="unit">psi</span></div></div>
-              <div class="split-metric"><div class="sub">Rear · Tacky Chan Radial</div><div class="value"><span id="dashRearPsi">30</span><span class="unit">psi</span></div></div>
+              <div class="split-metric"><div class="sub">Front · <span id="dashFrontTire">Shredda Rear · 29×2.50</span></div><div class="value"><span id="dashFrontPsi">27</span><span class="unit">psi</span></div></div>
+              <div class="split-metric"><div class="sub">Rear · <span id="dashRearTire">Shredda Rear · 27.5×2.50</span></div><div class="value"><span id="dashRearPsi">30</span><span class="unit">psi</span></div></div>
             </div>
           </div>
 
           <div class="setup-summary wide">
             <div class="setup-summary-head"><div class="label">Bike setup</div><span class="chip" id="todoCountChip">4 to-do</span></div>
             <div class="setup-lines">
-              <div class="setup-line"><span>Brake pads</span><strong>TRP blue resin</strong></div>
+              <div class="setup-line"><span>Brake pads</span><strong>TRP red semi-metallic</strong></div><div class="setup-line"><span>Chainstay geometry</span><strong id="dashGeometry">LO</strong></div>
               <div class="setup-line"><span>Rotors</span><strong>TRP 223 / 223 mm</strong></div>
               <div class="setup-line"><span>Anti-pedal kickback</span><strong>20°</strong></div>
             </div>
           </div>
         </div>
 
-        <button class="secondary" data-go="setup" style="margin-top:12px;background:rgba(255,255,255,.055)">View baseline comparison</button>
+        <div class="action-grid" style="margin-top:12px"><button class="primary" id="editCurrentSetup">Edit current setup</button><button class="secondary" data-go="setup">Compare baseline</button></div>
       </div>
 
       <div class="section-title"><h2>Last ride</h2><button data-go="rides">History</button></div>
@@ -306,7 +306,7 @@
         <div class="assessment">
           <h4>Baseline notes</h4>
           <p><b>Santa Cruz reference in your notes:</b> 195 psi, 28% sag (18.2–19.5 mm).</p>
-          <p><b>Current:</b> 200 psi, HI progression. Shock damper baselines remain separate from bike-specific recommendations.</p>
+          <p><b>Current:</b> 205 psi, LOW shock progression and LOW chainstay geometry. Remeasure sag after the pressure change.</p>
         </div>
       </div>
 
@@ -328,7 +328,7 @@
         <div class="mini-list">
           <div class="mini-line"><span>Storage</span><strong>Local on this iPhone</strong></div>
           <div class="mini-line"><span>Offline</span><strong>Yes after first load</strong></div>
-          <div class="mini-line"><span>Version</span><strong>0.1 PWA</strong></div>
+          <div class="mini-line"><span>Version</span><strong>0.2 PWA</strong></div>
         </div>
         <div class="action-grid" style="margin-top:14px">
           <button class="secondary" id="exportBtn">Export backup</button>
@@ -355,13 +355,13 @@
             <div class="spec-row"><span>Wheel setup</span><strong>29" front / 27.5" rear</strong></div>
             <div class="spec-row"><span>Fork</span><strong>FOX 38 Performance Elite · GRIP X2 · 170 mm</strong></div>
             <div class="spec-row"><span>Shock</span><strong>2026 FOX FLOAT X2 · 205×65 · Bullit tune</strong></div>
-            <div class="spec-row"><span>Rear hub</span><strong>DT Swiss · anti-pedal kickback 20°</strong></div>
-            <div class="spec-row"><span>Front tire</span><strong>Magic Mary Radial · Gravity Pro</strong></div>
-            <div class="spec-row"><span>Rear tire</span><strong>Tacky Chan Radial · Gravity Pro · Super Soft</strong></div>
+            <div class="spec-row"><span>Rear hub</span><strong>DT Swiss DEG DF · Anti-pedal kickback — 20° last confirmed</strong></div><div class="spec-row"><span>Flip chips</span><strong>Chainstay LOW · Shock LOW</strong></div>
+            <div class="spec-row"><span>Front tire</span><strong>Shredda Rear Radial · Gravity Pro Ultra Soft · 29×2.50</strong></div>
+            <div class="spec-row"><span>Rear tire</span><strong>Shredda Rear Radial · Gravity Pro Ultra Soft · 27.5×2.50</strong></div>
             <div class="spec-row"><span>Handlebar</span><strong>OneUp Carbon</strong></div>
             <div class="spec-row"><span>Grips</span><strong>ODI half-waffle</strong></div>
             <div class="spec-row"><span>Brakes</span><strong>Shimano Saint BR-M820</strong></div>
-            <div class="spec-row"><span>Rotors / pads</span><strong>TRP 223 / 223 · blue resin</strong></div>
+            <div class="spec-row"><span>Rotors / pads</span><strong>TRP 223 / 223 · red semi-metallic</strong></div>
           </div>
         </div>
 
@@ -539,10 +539,16 @@
     </div>
 
     <div class="fieldgrid">
-      <div class="field"><label>Fork PSI</label><div class="stepper" data-target="forkPsi" data-step="1"><button>-</button><div class="stepvalue"><span id="forkPsi">99</span> <small>psi</small></div><button>+</button></div></div>
+      <div class="field"><label>Front tire model</label><input type="text" id="frontTireModel" /></div>
+       <div class="field"><label>Rear tire model</label><input type="text" id="rearTireModel" /></div>
+       <div class="field"><label>Fork PSI</label><div class="stepper" data-target="forkPsi" data-step="1"><button>-</button><div class="stepvalue"><span id="forkPsi">99</span> <small>psi</small></div><button>+</button></div></div>
       <div class="field"><label>Shock PSI</label><div class="stepper" data-target="shockPsi" data-step="1"><button>-</button><div class="stepvalue"><span id="shockPsi">200</span> <small>psi</small></div><button>+</button></div></div>
     </div>
 
+    <div class="fieldgrid">
+      <div class="field"><label>Fork sag (mm)</label><input type="number" min="0" max="170" step="0.5" inputmode="decimal" id="forkSagMm" placeholder="Not measured" /><div class="data-note">170 mm travel · <strong id="forkSagPct">—</strong> sag</div></div>
+      <div class="field"><label>Shock sag (mm)</label><input type="number" min="0" max="65" step="0.5" inputmode="decimal" id="shockSagMm" placeholder="Recheck (was 19 mm)" /><div class="data-note">65 mm stroke · <strong id="shockSagPct">—</strong> sag</div></div>
+    </div>
     <div class="field"><label>Fork damping · clicks OUT from closed</label>
       <div class="fieldgrid">
         <div class="stepper" data-target="hsc" data-step="1"><button>-</button><div class="stepvalue">HSC <span id="hsc">8</span><small>/11</small></div><button>+</button></div>
@@ -561,7 +567,10 @@
       </div>
     </div>
 
-    <div class="field"><label>Shock progression</label><div class="seg"><button class="progression active" data-mode="HI">HI</button><button class="progression" data-mode="LO">LO</button></div></div>
+    <div class="fieldgrid">
+      <div class="field"><label>Chainstay geometry</label><div class="seg"><button class="geometry" data-mode="HI">HI</button><button class="geometry active" data-mode="LO">LO</button></div></div>
+      <div class="field"><label>Shock progression</label><div class="seg"><button class="progression" data-mode="HI">HI</button><button class="progression active" data-mode="LO">LO</button></div></div>
+    </div>
     <div class="field"><label>Before-ride note</label><textarea id="rideNotes" placeholder="What are you testing or changing on this ride?"></textarea></div>
 
     <details class="after-block" id="afterRideBlock">
@@ -598,7 +607,7 @@
   </div>
 </div>
 
-<script src="app.js"></script>
+<script src="app.js?v=0.2.0"></script>
 
 </body>
 </html>
