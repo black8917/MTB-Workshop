@@ -1,4 +1,4 @@
-const CACHE = 'bike-workshop-v0.1.1-phone';
+const CACHE = 'bike-workshop-v0.2.0-bullit';
 const CORE = [
   './',
   './index.html',
