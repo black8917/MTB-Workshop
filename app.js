@@ -378,7 +378,50 @@ function renderSetup(){
 function otherRow(label,value,note){
  return '<div class="compare-row"><div class="compare-top"><div class="setting">'+esc(label)+'</div><div class="your">'+esc(value)+'</div><div class="base">—</div><div class="delta neutral">—</div></div><div class="row-note">'+esc(note)+'</div></div>';
 }
+
+const SUPREME_REFERENCES={
+ commencal:{fork:{pressure:85,tokens:2,hsc:7,lsc:14,hsr:5,lsr:9},shock:{spring:500,hsc:2,lsc:2,lsr:7,hbo:1,sag:[20,25]}},
+ manuals:{fork:{pressure:[76,87],tokens:2,hsc:5,lsc:10,hsr:6,lsr:6},shock:{spring:450,lsr:11,sag:[30,30]}}
+};
+function supremeRow(k,y,ref,unit='',note='',deltaAllowed=true){
+ const yNum=Number.isFinite(y),refNum=Number.isFinite(ref),refRange=Array.isArray(ref);
+ let diff=null;
+ if(deltaAllowed&&yNum){
+  if(refNum)diff=y-ref;
+  else if(refRange&&ref.every(Number.isFinite))diff=y<ref[0]?y-ref[0]:y>ref[1]?y-ref[1]:0;
+ }
+ const df=diff===null?'—':diff===0?'0':(diff>0?'+':'')+diff;
+ const b=refNum?String(ref):refRange?ref.join('–'):'—';
+ return '<div class="compare-row"><div class="compare-top"><div class="setting">'+esc(k)+'</div><div class="your">'+esc(yNum?y+unit:'—')+'</div><div class="base">'+esc(b==='—'?b:b+unit)+'</div><div class="delta '+(diff===null?'neutral':Math.abs(diff)<=1?'good':'warn')+'">'+esc(df)+'</div></div><div class="row-note">'+esc(note)+'</div></div>';
+}
+function renderSupremeReference(){
+ const c=current(),isCommencal=baseline==='sc',ref=SUPREME_REFERENCES[isCommencal?'commencal':'manuals'],f=ref.fork,r=ref.shock;
+ $('suspensionReference').textContent=isCommencal
+  ?'Commencal V5 85kg/187lb EXPERT: FOX Factory fork row and RockShox Ultimate shock row, combined for the installed mixed components.'
+  :'FOX 40 GRIP X2 2026/2027 manual and user-provided RockShox generic 185lb/220mm/30% calculator. Generic setup is separate from Commencal.';
+ const note='FOX fork clicks OUT from fully clockwise closed. More compression clicks = softer; more rebound clicks = faster.';
+ const forkSag=Number.isFinite(c.forkSagMm)?Number((100*c.forkSagMm/(c.forkTravel||203)).toFixed(1)):null;
+ $('forkRows').innerHTML=[
+  supremeRow('Pressure',c.forkPsi,f.pressure,' psi','FOX 40 pressure starting point; confirm 15–20% fork sag.'),
+  supremeRow('Tokens',c.spacers,f.tokens,'','203mm FOX 40 ships with 2 spacers; maximum 5.'),
+  ...[['HSC',c.hsc,f.hsc],['LSC',c.lsc,f.lsc],['HSR',c.hsr,f.hsr],['LSR',c.lsr,f.lsr]].map(x=>supremeRow(x[0],x[1],x[2],' out',note)),
+  supremeRow('Fork sag',forkSag,isCommencal?null:[15,20],'%','FOX 15–20% = about 30–41mm for 203mm travel.')
+ ].join('');
+ const sag=Number.isFinite(c.shockSagMm)&&c.shockStroke?Number((100*c.shockSagMm/c.shockStroke).toFixed(1)):null;
+ const warning='RockShox compression adjusters use a center-zero reference in C1 service documentation; verify the adjuster convention before comparing exact HSC/LSC/HBO click offsets.';
+ $('shockRows').innerHTML=[
+  supremeRow('Spring',c.springRate,r.spring,' lb/in',isCommencal?'Commencal V5 expert target 500lb/in.':'Generic RockShox 30%-sag calculator shows 450lb/in; less bike-specific.'),
+  supremeRow('Sag',sag,r.sag,'%','Commencal V5 20–25% = 15–18.75mm from 75mm stroke.'),
+  supremeRow('HSC',c.shockHsc,r.hsc,'',warning,false),
+  supremeRow('LSC',c.shockLsc,r.lsc,'',warning,false),
+  supremeRow('Rebound',c.shockLsr,r.lsr,' out','Vivid Ultimate DH has one rebound adjustment.'),
+  supremeRow('HBO',c.hbo,r.hbo,'',warning,false),
+  otherRow('Geometry',c.geometry||'—','Current geometry'),otherRow('Progression',c.progression||'—','Current linkage progression')
+ ].join('');
+}
+
 function renderOtherBikeSetup(){
+ if(activeBike==='supreme'){renderSupremeReference();return;}
  const c=current(),p=profile(),stroke=c.shockStroke||p.shockStroke;
  $('suspensionReference').textContent=p.name+' · Current settings only. Manufacturer baseline not yet verified; never reuse Bullit-specific pressure, damping or torque values.';
  $('forkRows').innerHTML=[
@@ -397,7 +440,11 @@ function renderOtherBikeSetup(){
 }
 function renderProfileSpecs(){
  const bullit=activeBike==='bullit',c=current(),p=profile();
- $('baselineSelector').style.display=bullit?'':'none';
+ const supreme=activeBike==='supreme';
+ $('baselineSelector').style.display=bullit||supreme?'':'none';
+ $('baselineBrandLabel').textContent=supreme?'Commencal · 185 lb':'Santa Cruz · 185 lb';
+ $('baselineManualLabel').textContent=supreme?'FOX / RockShox':'FOX manual';
+ $('supremeSourceLinks').style.display=supreme?'':'none';
  $('setupForkDesc').textContent=(c.forkModel||p.fork)+' · '+(c.forkTravel||p.forkTravel)+' mm';
  $('setupShockDesc').textContent=c.shockModel||p.shock;
  for(const el of document.querySelectorAll('#setup .assessment, #setup .tiny, #spec-components > details.component-detail')){
