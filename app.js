@@ -1,13 +1,16 @@
 'use strict';
 
-const APP_VERSION = '0.1.0';
+const APP_VERSION = '0.2.0';
 const DB_NAME = 'BikeWorkshopPWA';
 const DB_VERSION = 1;
 let db;
 let rides = [];
 let todos = [];
 let maintenance = [];
-let progression = 'HI';
+let progression = 'LO';
+let geometry = 'LO';
+let setupOverride = null;
+let editingSetup = false;
 let baseline = 'fox';
 let editingRideId = null;
 let simpleMode = null;
@@ -15,6 +18,38 @@ let simpleMode = null;
 const $ = id => document.getElementById(id);
 const esc = value => String(value ?? '').replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
 const uid = prefix => `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2,9)}`;
+
+const DEFAULT_CURRENT_SETUP = {
+  "id": "bullit_current_20261113",
+  "date": "2026-11-13",
+  "createdAt": "2026-11-13T22:30:00",
+  "location": "Current setup",
+  "frontPsi": 23,
+  "rearPsi": 25,
+  "frontTire": "Schwalbe Shredda Rear Radial Gravity Pro Ultra Soft TLR 29×2.50",
+  "rearTire": "Schwalbe Shredda Rear Radial Gravity Pro Ultra Soft TLR 27.5×2.50",
+  "forkPsi": 97,
+  "forkTravel": 170,
+  "spacers": 1,
+  "forkSagMm": null,
+  "shockPsi": 205,
+  "shockStroke": 65,
+  "shockSagMm": null,
+  "lastShockSagMm": 19,
+  "hsc": 10,
+  "lsc": 10,
+  "hsr": 6,
+  "lsr": 5,
+  "shockHsc": 3,
+  "shockLsc": 9,
+  "shockHsr": 4,
+  "shockLsr": 8,
+  "progression": "LO",
+  "geometry": "LO",
+  "antiPedalKickbackDeg": 20,
+  "notes": "Current setup reported Nov 13. Recheck shock sag after changing pressure to 205 psi and shock progression to LOW.",
+  "after": {}
+};
 
 const baseRides = [
   {id:'seed_20260930',date:'2026-09-30',createdAt:'2026-09-30T12:00:00',location:'Current setup',conditions:'',frontPsi:27,rearPsi:30,forkPsi:99,forkTravel:170,spacers:1,shockPsi:200,hsc:8,lsc:10,hsr:6,lsr:6,shockHsc:4,shockLsc:5,shockHsr:3,shockLsr:11,progression:'HI',notes:'Latest saved Bullit suspension setup. Shock LSC carried forward from Sep 9 because the Sep 30 note is blank.',after:{}},
@@ -55,6 +90,7 @@ function openDB(){
 }
 function tx(store,mode='readonly'){return db.transaction(store,mode).objectStore(store);}
 function getAll(store){return new Promise((resolve,reject)=>{const r=tx(store).getAll();r.onsuccess=()=>resolve(r.result||[]);r.onerror=()=>reject(r.error);});}
+function getMeta(key){return new Promise((resolve,reject)=>{const r=tx('meta').get(key);r.onsuccess=()=>resolve(r.result?.value);r.onerror=()=>reject(r.error);});}
 function put(store,obj){return new Promise((resolve,reject)=>{const r=tx(store,'readwrite').put(obj);r.onsuccess=()=>resolve(obj);r.onerror=()=>reject(r.error);});}
 function del(store,key){return new Promise((resolve,reject)=>{const r=tx(store,'readwrite').delete(key);r.onsuccess=()=>resolve();r.onerror=()=>reject(r.error);});}
 function clearStore(store){return new Promise((resolve,reject)=>{const r=tx(store,'readwrite').clear();r.onsuccess=()=>resolve();r.onerror=()=>reject(r.error);});}
@@ -70,6 +106,20 @@ async function seedIfNeeded(){
   }
   if(!(await getAll('todos')).length) for(const t of baseTodos) await put('todos',t);
   if(!(await getAll('maintenance')).length) for(const m of baseMaintenance) await put('maintenance',m);
+  // Upgrade: create a distinct editable current setup; do not mutate saved rides.
+  if(!(await getMeta('currentSetupV2'))){
+    const saved=sortRides(await getAll('rides'))[0];
+    const chosen=saved && saved.date>DEFAULT_CURRENT_SETUP.date ? saved : DEFAULT_CURRENT_SETUP;
+    await put('meta',{key:'currentSetupV2',value:chosen});
+  }
+  if(!(await getMeta('serviceMigrationV2'))){
+    // Stable IDs avoid duplicate service items on subsequent launches.
+    if(!(await getAll('maintenance')).some(m=>m.id==='maint_red_pads_20260930'))
+      await put('maintenance',{id:'maint_red_pads_20260930',date:'2026-09-30',category:'Brakes',note:'Replaced TRP blue resin pads with red semi-metallic. Sanded rotors and wiped with isopropyl alcohol before bedding.',createdAt:'2026-09-30T19:12:00'});
+    if(!(await getAll('todos')).some(t=>t.id==='todo_bosch_500008'))
+      await put('todos',{id:'todo_bosch_500008',text:'Investigate Bosch fault 500008',detail:'After downhill coasting, cranks have sometimes spun without moving chainring; intermittent delayed engagement, clunk and whir.',done:false,createdAt:'2026-11-13T22:30:00'});
+    await put('meta',{key:'serviceMigrationV2',value:true});
+  }
   await put('meta',{key:'appVersion',value:APP_VERSION});
 }
 
@@ -79,9 +129,10 @@ async function reload(){
   rides=sortRides(await getAll('rides'));
   todos=await getAll('todos');
   maintenance=sortMaintenance(await getAll('maintenance'));
+  setupOverride=await getMeta('currentSetupV2');
   renderAll();
 }
-const current=()=>rides[0]||baseRides[0];
+const current=()=>setupOverride||rides[0]||DEFAULT_CURRENT_SETUP;
 function prettyDate(s){if(!s)return '—';const d=new Date(`${s}T12:00:00`);return d.toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'});}
 function shortDate(s){if(!s)return '—';const d=new Date(`${s}T12:00:00`);return d.toLocaleDateString(undefined,{month:'short',day:'numeric'});}
 
@@ -99,6 +150,11 @@ function renderDashboard(){
   $('dashShockPsi').textContent=c.shockPsi;
   $('dashFrontPsi').textContent=c.frontPsi;
   $('dashRearPsi').textContent=c.rearPsi;
+  $('dashFrontTire').textContent=c.frontTire||DEFAULT_CURRENT_SETUP.frontTire;
+  $('dashRearTire').textContent=c.rearTire||DEFAULT_CURRENT_SETUP.rearTire;
+  $('dashGeometry').textContent=c.geometry||'—';
+  $('dashForkSag').textContent=Number.isFinite(c.forkSagMm)?c.forkSagMm+' mm / '+(100*c.forkSagMm/170).toFixed(1)+'%':'Sag not measured';
+  $('dashShockSag').textContent=Number.isFinite(c.shockSagMm)?c.shockSagMm+' mm / '+(100*c.shockSagMm/65).toFixed(1)+'%':'Recheck sag (previously 19 mm)';
   $('dashHSC').textContent=`${c.hsc} / 11`;
   $('dashLSC').textContent=`${c.lsc} / 18`;
   $('dashLSR').textContent=`${c.lsr} / 15`;
@@ -111,11 +167,12 @@ function renderDashboard(){
   const open=todos.filter(t=>!t.done).length;
   $('todoCountChip').textContent=`${open} to-do${open===1?'':'s'}`;
 
-  const a=c.after||{};
+  const last=rides[0]||c;
+  const a=last.after||{};
   const afterBits=[a.overall,a.next?`Next: ${a.next}`:''].filter(Boolean);
   $('lastRideCard').innerHTML=`
-    <div class="row"><div><div class="kicker">${esc(prettyDate(c.date))}</div><h3>${esc(c.location||'Saved setup')}</h3></div><div style="font-size:24px">›</div></div>
-    <div class="chips"><span class="chip">Fork ${esc(c.forkPsi)} psi</span><span class="chip">Shock ${esc(c.shockPsi)} psi</span><span class="chip">${esc(c.progression)} progression</span></div>
+    <div class="row"><div><div class="kicker">${esc(prettyDate(last.date))}</div><h3>${esc(last.location||'Saved setup')}</h3></div><div style="font-size:24px">›</div></div>
+    <div class="chips"><span class="chip">Fork ${esc(last.forkPsi)} psi</span><span class="chip">Shock ${esc(last.shockPsi)} psi</span><span class="chip">${esc(last.progression)} progression</span></div>
     <div class="note" style="margin-top:10px;color:#cfd1d5;font-size:13px">${afterBits.length?esc(afterBits.join(' · ')):'Use this as the starting point for the next ride. Change only what you actually touch.'}</div>`;
 }
 
@@ -125,7 +182,7 @@ function renderRides(){
     const a=r.after||{};
     const after=afterHasData(a)?`<div class="after-summary"><div class="line"><strong>After ride${a.overall?` · ${esc(a.overall)}`:''}</strong></div>${a.feel?`<div class="line">${esc(a.feel)}</div>`:''}${a.next?`<div class="line"><strong>Next:</strong> ${esc(a.next)}</div>`:''}</div>`:'';
     return `<div class="ride-card">
-      <div class="row"><div><div class="date">${esc(prettyDate(r.date))}</div><div class="meta">${esc(r.location||'Ride')}${r.conditions?` · ${esc(r.conditions)}`:''}</div></div>${i===0?'<span class="status-pill"><span class="status-dot"></span>Current</span>':''}</div>
+      <div class="row"><div><div class="date">${esc(prettyDate(r.date))}</div><div class="meta">${esc(r.location||'Ride')}${r.conditions?` · ${esc(r.conditions)}`:''}</div></div>${i===0?'<span class="status-pill"><span class="status-dot"></span>Latest ride</span>':''}</div>
       <div class="chips"><span class="chip">Fork ${esc(r.forkPsi)} psi</span><span class="chip">HSC ${esc(r.hsc)}/11</span><span class="chip">LSR ${esc(r.lsr)}/15</span><span class="chip">Shock ${esc(r.shockPsi)} psi</span><span class="chip">S LSR ${esc(r.shockLsr ?? '—')}</span><span class="chip">${esc(r.progression)}</span></div>
       ${r.notes?`<div class="note">${esc(r.notes)}</div>`:''}${after}
       <div class="ride-actions"><button data-edit-ride="${esc(r.id)}">${afterHasData(a)?'Edit ride':'Add after-ride notes'}</button></div>
@@ -158,6 +215,7 @@ function comparisonRow(label,y,b,max,note,unit='',maxLabel=''){
 function renderSetup(){
   const c=current(),f=forkBaseline[baseline],s=shockBaseline[baseline];
   $('forkRows').innerHTML=
+    `<div class="compare-row"><div class="compare-top"><div class="setting">Sag</div><div class="your">${Number.isFinite(c.forkSagMm)?esc(c.forkSagMm+' mm / '+(c.forkSagMm/170*100).toFixed(1)+'%'):'Not measured'}</div><div class="base">—</div><div class="delta neutral">—</div></div><div class="row-note">Measured mm; percent calculated from 170 mm fork travel.</div></div>`+
     comparisonRow('Air pressure',c.forkPsi,f.pressure,140,baseline==='fox'?'FOX 2026 38 FLOAT starting point shown for 170–180 lb. FOX also lists a separate E-Bike+ pressure; confirm exact fork chassis before treating this as your final pressure baseline.':'Santa Cruz does not publish a pressure target in the bike page currently stored in the app. Use sag and verified bike-specific setup data.','psi')+
     comparisonRow('HSC',c.hsc,f.hsc,11,baseline==='fox'?'FOX GRIP X2 generic start: 5 clicks OUT from closed.':'No Santa Cruz HSC value stored yet.','','/11')+
     comparisonRow('LSC',c.lsc,f.lsc,18,baseline==='fox'?'FOX GRIP X2 generic start: 10 clicks OUT from closed.':'No Santa Cruz LSC value stored yet.','','/18')+
@@ -165,7 +223,8 @@ function renderSetup(){
     comparisonRow('LSR',c.lsr,f.lsr,15,baseline==='fox'?'FOX rebound table varies with rider weight/pressure; this reference is for the 170–180 lb row.':'No Santa Cruz LSR value stored yet.','','/15');
   $('shockRows').innerHTML=
     comparisonRow('Air pressure',c.shockPsi,s.pressure,300,baseline==='fox'?'No generic pressure target is applied here; the exact Float X2 tune should be set by sag/bike-specific guidance.':'No Santa Cruz pressure baseline stored yet.','psi')+
-    `<div class="compare-row"><div class="compare-top"><div class="setting">Sag</div><div class="your">—</div><div class="base">—</div><div class="delta neutral">—</div></div><div class="row-note">Your imported note records a 28% / 18.2–19.5 mm shock-sag reference and 15–20% fork sag. It remains a saved reference until its exact source is confirmed.</div></div>`+
+    `<div class="compare-row"><div class="compare-top"><div class="setting">Sag</div><div class="your">${Number.isFinite(c.shockSagMm)?esc(c.shockSagMm+' mm / '+(c.shockSagMm/65*100).toFixed(1)+'%'):'Recheck'}</div><div class="base">—</div><div class="delta neutral">—</div></div><div class="row-note">19 mm was measured before the 205 psi / LOW progression setup. Stroke is 65 mm.</div></div>`+
+    `<div class="compare-row"><div class="compare-top"><div class="setting">Geometry</div><div class="your">${esc(c.geometry||'—')}</div><div class="base">—</div><div class="delta neutral">—</div></div><div class="row-note">Chainstay flip chips.</div></div>`+
     `<div class="compare-row"><div class="compare-top"><div class="setting">Progression</div><div class="your">${esc(c.progression)}</div><div class="base">—</div><div class="delta neutral">—</div></div><div class="row-note">Stored with every ride so HI/LO changes remain visible in history.</div></div>`+
     `<div class="compare-row"><div class="compare-top"><div class="setting">HSC / LSC</div><div class="your">${esc(c.shockHsc ?? '—')} / ${esc(c.shockLsc ?? '—')}</div><div class="base">—</div><div class="delta neutral">—</div></div><div class="row-note">Exact manufacturer baseline for the Bullit-specific X2 tune is intentionally not guessed.</div></div>`+
     `<div class="compare-row"><div class="compare-top"><div class="setting">HSR / LSR</div><div class="your">${esc(c.shockHsr ?? '—')} / ${esc(c.shockLsr ?? '—')}</div><div class="base">—</div><div class="delta neutral">—</div></div><div class="row-note">Clicks OUT from fully closed.</div></div>`;
@@ -194,17 +253,37 @@ function fillRideForm(r){
   $('conditions').value=r.conditions||'Dry';
   $('rideNotes').value=r.notes||'';
   setStep('frontPsi',r.frontPsi);setStep('rearPsi',r.rearPsi);setStep('forkPsi',r.forkPsi);setStep('shockPsi',r.shockPsi);
+  $('frontTireModel').value=r.frontTire||DEFAULT_CURRENT_SETUP.frontTire;
+  $('rearTireModel').value=r.rearTire||DEFAULT_CURRENT_SETUP.rearTire;
+  $('forkSagMm').value=Number.isFinite(r.forkSagMm)?r.forkSagMm:'';
+  $('shockSagMm').value=Number.isFinite(r.shockSagMm)?r.shockSagMm:'';
+  updateSagDisplay();
   setStep('hsc',r.hsc);setStep('lsc',r.lsc);setStep('hsr',r.hsr);setStep('lsr',r.lsr);
   setStep('shockHsc',r.shockHsc??4);setStep('shockLsc',r.shockLsc??5);setStep('shockHsr',r.shockHsr??3);setStep('shockLsr',r.shockLsr??11);
-  progression=r.progression||'HI';
+  progression=r.progression||'LO';
+  geometry=r.geometry||'LO';
   document.querySelectorAll('.progression').forEach(x=>x.classList.toggle('active',x.dataset.mode===progression));
+  document.querySelectorAll('.geometry').forEach(x=>x.classList.toggle('active',x.dataset.mode===geometry));
   clearRideForm();
   const a=r.after||{};
   $('afterOverall').value=a.overall||'';$('afterBottom').value=a.bottom||'';$('afterForkTravel').value=a.forkTravel||'';$('afterShockTravel').value=a.shockTravel||'';$('afterFeel').value=a.feel||'';$('afterWorked').value=a.worked||'';$('afterDidnt').value=a.didnt||'';$('afterNext').value=a.next||'';$('afterNotes').value=a.notes||'';
   $('afterRideBlock').open=afterHasData(a);
 }
+function updateSagDisplay(){
+  for(const [field,out,stroke] of [['forkSagMm','forkSagPct',170],['shockSagMm','shockSagPct',65]]){
+    const v=$(field).value.trim();
+    $(out).textContent=v!=='' && Number.isFinite(Number(v)) ? (100*Number(v)/stroke).toFixed(1)+'%' : '—';
+  }
+}
+function openCurrentSetup(){
+  editingSetup=true;editingRideId=null;fillRideForm(current());
+  document.querySelector('#rideModal h2').textContent='Edit current setup';
+  document.querySelector('#rideModal .subhead').textContent='Save settings without adding a ride to your history.';
+  $('saveRide').textContent='Save setup';
+  $('rideModal').classList.add('open');
+}
 function openRide(id=null){
-  editingRideId=id;
+  editingSetup=false;editingRideId=id;
   const isEdit=!!id;
   const r=isEdit?rides.find(x=>x.id===id):{...current(),id:null,date:new Date().toISOString().slice(0,10),location:'',conditions:'Dry',notes:'',after:{}};
   fillRideForm(r);
@@ -213,17 +292,24 @@ function openRide(id=null){
   $('saveRide').textContent=isEdit?'Save changes':'Save ride';
   $('rideModal').classList.add('open');
 }
-function closeRide(){$('rideModal').classList.remove('open');editingRideId=null;}
+function closeRide(){$('rideModal').classList.remove('open');editingRideId=null;editingSetup=false;}
 async function saveRide(){
   const old=editingRideId?rides.find(r=>r.id===editingRideId):null;
   const r={
-    ...(old||{}),id:old?.id||uid('ride'),createdAt:old?.createdAt||new Date().toISOString(),
-    date:$('rideDate').value||new Date().toISOString().slice(0,10),location:$('location').value.trim()||'Ride',conditions:$('conditions').value,notes:$('rideNotes').value.trim(),progression,
+    ...(old||current()),id:old?.id||uid('ride'),createdAt:old?.createdAt||new Date().toISOString(),
+    date:$('rideDate').value||new Date().toISOString().slice(0,10),location:$('location').value.trim()||'Ride',conditions:$('conditions').value,notes:$('rideNotes').value.trim(),progression,geometry,frontTire:$('frontTireModel').value.trim(),rearTire:$('rearTireModel').value.trim(),forkSagMm:$('forkSagMm').value.trim()===''?null:Number($('forkSagMm').value),shockSagMm:$('shockSagMm').value.trim()===''?null:Number($('shockSagMm').value),shockStroke:65,
     frontPsi:Number($('frontPsi').textContent),rearPsi:Number($('rearPsi').textContent),forkPsi:Number($('forkPsi').textContent),forkTravel:old?.forkTravel||170,spacers:old?.spacers??1,shockPsi:Number($('shockPsi').textContent),
     hsc:Number($('hsc').textContent),lsc:Number($('lsc').textContent),hsr:Number($('hsr').textContent),lsr:Number($('lsr').textContent),shockHsc:Number($('shockHsc').textContent),shockLsc:Number($('shockLsc').textContent),shockHsr:Number($('shockHsr').textContent),shockLsr:Number($('shockLsr').textContent),
     after:{overall:$('afterOverall').value,bottom:$('afterBottom').value,forkTravel:$('afterForkTravel').value.trim(),shockTravel:$('afterShockTravel').value.trim(),feel:$('afterFeel').value.trim(),worked:$('afterWorked').value.trim(),didnt:$('afterDidnt').value.trim(),next:$('afterNext').value.trim(),notes:$('afterNotes').value.trim()}
   };
-  await put('rides',r);closeRide();await reload();go('dashboard');
+  if(editingSetup){
+    const updated={...r,id:'bullit_current_user',date:new Date().toISOString().slice(0,10),createdAt:new Date().toISOString(),location:'Current setup',after:{}};
+    await put('meta',{key:'currentSetupV2',value:updated});
+  }else{
+    await put('rides',r);
+    if(r.date>=current().date)await put('meta',{key:'currentSetupV2',value:r});
+  }
+  closeRide();await reload();go('dashboard');
 }
 
 function openSimple(mode){
@@ -252,7 +338,7 @@ async function saveSimple(){
 }
 
 async function exportBackup(){
-  const payload={format:'bike-workshop-pwa',version:APP_VERSION,exportedAt:new Date().toISOString(),bike:'2026 Santa Cruz Bullit GX Large',rides:await getAll('rides'),todos:await getAll('todos'),maintenance:await getAll('maintenance')};
+  const payload={format:'bike-workshop-pwa',version:APP_VERSION,exportedAt:new Date().toISOString(),bike:'2026 Santa Cruz Bullit GX Large',currentSetup:current(),rides:await getAll('rides'),todos:await getAll('todos'),maintenance:await getAll('maintenance')};
   const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
   const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=`bike-workshop-bullit-${new Date().toISOString().slice(0,10)}.json`;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
@@ -265,6 +351,7 @@ async function importBackup(file){
   for(const r of payload.rides||[])await put('rides',{...r,id:r.id||uid('ride')});
   for(const t of payload.todos||[])await put('todos',{...t,id:t.id||uid('todo')});
   for(const m of payload.maintenance||[])await put('maintenance',{...m,id:m.id||uid('maint')});
+  await put('meta',{key:'currentSetupV2',value:payload.currentSetup||sortRides(payload.rides)[0]||DEFAULT_CURRENT_SETUP});
   await reload();alert('Backup imported.');
 }
 
@@ -272,11 +359,14 @@ function wireEvents(){
   document.querySelectorAll('.navbtn').forEach(b=>b.onclick=()=>go(b.dataset.screen));
   document.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>go(b.dataset.go));
   [$('headerAdd'),$('newRideMain'),$('newRideRides'),$('fab')].forEach(b=>b&&(b.onclick=()=>openRide()));
+  $('editCurrentSetup').onclick=openCurrentSetup;
+  $('forkSagMm').oninput=updateSagDisplay;$('shockSagMm').oninput=updateSagDisplay;
+  document.querySelectorAll('.geometry').forEach(b=>b.onclick=()=>{geometry=b.dataset.mode;document.querySelectorAll('.geometry').forEach(x=>x.classList.toggle('active',x===b));});
   $('cancelRide').onclick=closeRide;$('saveRide').onclick=saveRide;$('rideModal').onclick=e=>{if(e.target===$('rideModal'))closeRide();};
   document.querySelectorAll('.progression').forEach(b=>b.onclick=()=>{progression=b.dataset.mode;document.querySelectorAll('.progression').forEach(x=>x.classList.toggle('active',x===b));});
   document.querySelectorAll('.stepper').forEach(s=>{
     const [minus,,plus]=s.children,id=s.dataset.target,step=Number(s.dataset.step||1);
-    const limits={hsc:[0,11],lsc:[0,18],hsr:[0,8],lsr:[0,15],frontPsi:[0,60],rearPsi:[0,60],forkPsi:[0,140],shockPsi:[0,350],shockHsc:[0,20],shockLsc:[0,20],shockHsr:[0,20],shockLsr:[0,30]};
+    const limits={hsc:[0,11],lsc:[0,18],hsr:[0,8],lsr:[0,15],frontPsi:[0,60],rearPsi:[0,60],forkPsi:[0,140],shockPsi:[0,350],shockHsc:[0,9],shockLsc:[0,19],shockHsr:[0,7],shockLsr:[0,16]};
     const change=dir=>{const el=$(id);let v=Number(el.textContent);v+=dir*step;const [min,max]=limits[id]||[0,999];v=Math.max(min,Math.min(max,v));el.textContent=Number.isInteger(v)?v:v.toFixed(1);};
     minus.onclick=e=>{e.preventDefault();change(-1);};plus.onclick=e=>{e.preventDefault();change(1);};
   });
