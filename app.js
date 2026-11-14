@@ -473,6 +473,9 @@ function renderProfileSpecs(){
  if(activeBike==='supreme'){
    $('otherBikeComponents').innerHTML+='<div class="card"><h3>Rider observations</h3><div class="spec-row"><span>FOX 40 bottom-out marker</span><strong>12mm from top (user measured)</strong></div><div class="spec-row"><span>O-Chain (July 23–24)</span><strong>9°</strong></div><div class="spec-row"><span>Chainstay (July 23)</span><strong>+6mm</strong></div><div class="spec-row"><span>Handlebar (July 23)</span><strong>Rolled back 5°</strong></div><div class="data-note">Historical notes only; verify current positions before treating these as installed today.</div></div>';
  }
+ if(activeBike==='supreme'){
+  $('otherBikeComponents').innerHTML += '<div class="card"><h3>Rider observations</h3><div class="spec-row"><span>Fork bottom-out indicator</span><strong>12mm from top</strong></div><div class="spec-row"><span>O-Chain (July 23–24)</span><strong>9°</strong></div><div class="spec-row"><span>Chainstay (July 23)</span><strong>+6mm</strong></div><div class="spec-row"><span>Bars rolled back (July 23)</span><strong>5°</strong></div><div class="data-note">Historical notes, not confirmed as current hardware positions. Fork marker is a rider observation, not a factory specification.</div></div>';
+ }
 }
 
 function renderTodos(){
