@@ -285,7 +285,8 @@
       <div class="setup-head">
         <div><h2>Suspension</h2><p>Current vs manufacturer starting point</p></div>
       </div>
-      <div class="seg" style="margin-bottom:14px"><button class="baseline-btn active" data-baseline="sc">Santa Cruz</button><button class="baseline-btn" data-baseline="fox">FOX</button></div>
+      <div class="seg" style="margin-bottom:10px"><button class="baseline-btn active" data-baseline="sc">Santa Cruz · 185 lb</button><button class="baseline-btn" data-baseline="fox">FOX manual</button></div>
+       <div class="data-note" id="suspensionReference" style="margin-bottom:14px"></div>
 
       <div class="component-card" id="forkCard">
         <div class="component-header"><div><div class="name">Fork</div><div class="desc">FOX 38 · GRIP X2 · 170 mm</div></div><div class="status-pill"><span class="status-dot"></span>Current</div></div>
@@ -293,7 +294,7 @@
         <div id="forkRows"></div>
         <div class="assessment">
           <h4>Setup assessment</h4>
-          <p><b>Overall:</b> Your current fork is firmer in air pressure than the generic FOX FLOAT starting point, while compression is mixed relative to baseline.</p>
+          <p><b>Overall:</b> The Santa Cruz 185 lb reference is for the X01 Factory FOX 38. Your installed fork is Performance Elite GRIP X2, so use this as a setup reference, not an exact fork tune match.</p>
           <p><b>Trade-off:</b> Use the baseline as a starting reference, not a target. Your ride notes stay attached to the exact setup that produced them.</p>
           <p><b>Next test:</b> Change one damping parameter at a time and save a new ride so the history remains useful.</p>
         </div>
@@ -305,12 +306,12 @@
         <div id="shockRows"></div>
         <div class="assessment">
           <h4>Baseline notes</h4>
-          <p><b>Santa Cruz reference in your notes:</b> 195 psi, 28% sag (18.2–19.5 mm).</p>
+          <p><b>Santa Cruz 185 lb X01 baseline:</b> 215 psi and 28–30% sag; rebound LSR 11 / HSR 3, compression LSC 6 / HSC 3, all clicks OUT. Your installed X2 came from the X01.</p>
           <p><b>Current:</b> 205 psi, LOW shock progression and LOW chainstay geometry. Remeasure sag after the pressure change.</p>
         </div>
       </div>
 
-      <div class="tiny">Prototype note: baseline data is intentionally separated by source. FOX generic starting points and Santa Cruz/Bullit-specific values are not treated as interchangeable.</div>
+      <div class="tiny">Sources: <a href="https://www.santacruzbicycles.com/pages/product-support/bullit-4-my-26" target="_blank" rel="noopener noreferrer">Santa Cruz Bullit 4 support / suspension calculator</a> (185 lb X01 AXS snapshot) and <a href="https://tech.ridefox.com/bike/owners-manuals/3023/shock--2026-float-x2" target="_blank" rel="noopener noreferrer">FOX 2026 FLOAT X2 manual</a>. These references never overwrite your saved setup.</div>
     </section>
 
     <section id="service" class="screen">
@@ -328,7 +329,7 @@
         <div class="mini-list">
           <div class="mini-line"><span>Storage</span><strong>Local on this iPhone</strong></div>
           <div class="mini-line"><span>Offline</span><strong>Yes after first load</strong></div>
-          <div class="mini-line"><span>Version</span><strong>0.2 PWA</strong></div>
+          <div class="mini-line"><span>Version</span><strong>0.3 Preview · unreleased</strong></div>
         </div>
         <div class="action-grid" style="margin-top:14px">
           <button class="secondary" id="exportBtn">Export backup</button>
@@ -607,7 +608,7 @@
   </div>
 </div>
 
-<script src="app.js?v=0.2.0"></script>
+<script src="app.js?v=0.3.0-preview"></script>
 
 </body>
 </html>
