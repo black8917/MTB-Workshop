@@ -177,38 +177,47 @@ function go(screen){
 }
 
 function renderDashboard(){
-  const c=current();
-  $('dashSavedDate').textContent=shortDate(c.date);
-  $('dashForkPsi').textContent=c.forkPsi;
-  $('dashShockPsi').textContent=c.shockPsi;
-  $('dashFrontPsi').textContent=c.frontPsi;
-  $('dashRearPsi').textContent=c.rearPsi;
-  $('dashFrontTire').textContent=c.frontTire||DEFAULT_CURRENT_SETUP.frontTire;
-  $('dashRearTire').textContent=c.rearTire||DEFAULT_CURRENT_SETUP.rearTire;
-  $('dashGeometry').textContent=c.geometry||'—';
-  $('dashForkSag').textContent=Number.isFinite(c.forkSagMm)?c.forkSagMm+' mm / '+(100*c.forkSagMm/170).toFixed(1)+'%':'Sag not measured';
-  $('dashShockSag').textContent=Number.isFinite(c.shockSagMm)?c.shockSagMm+' mm / '+(100*c.shockSagMm/65).toFixed(1)+'%':'Recheck sag (previously 19 mm)';
-  $('dashHSC').textContent=`${c.hsc} / 11`;
-  $('dashLSC').textContent=`${c.lsc} / 18`;
-  $('dashLSR').textContent=`${c.lsr} / 15`;
-  $('dashHSR').textContent=`${c.hsr} / 8`;
-  $('dashShockHSC').textContent=c.shockHsc ?? '—';
-  $('dashShockLSC').textContent=c.shockLsc ?? '—';
-  $('dashShockHSR').textContent=c.shockHsr ?? '—';
-  $('dashShockLSR').textContent=c.shockLsr ?? '—';
-  $('dashProgression').textContent=c.progression||'—';
-  const open=todos.filter(t=>!t.done).length;
-  $('todoCountChip').textContent=`${open} to-do${open===1?'':'s'}`;
-
-  const last=rides[0]||c;
-  const a=last.after||{};
-  const afterBits=[a.overall,a.next?`Next: ${a.next}`:''].filter(Boolean);
-  $('lastRideCard').innerHTML=`
-    <div class="row"><div><div class="kicker">${esc(prettyDate(last.date))}</div><h3>${esc(last.location||'Saved setup')}</h3></div><div style="font-size:24px">›</div></div>
-    <div class="chips"><span class="chip">Fork ${esc(last.forkPsi)} psi</span><span class="chip">Shock ${esc(last.shockPsi)} psi</span><span class="chip">${esc(last.progression)} progression</span></div>
-    <div class="note" style="margin-top:10px;color:#cfd1d5;font-size:13px">${afterBits.length?esc(afterBits.join(' · ')):'Use this as the starting point for the next ride. Change only what you actually touch.'}</div>`;
+ const c=current(),p=profile(),coil=(c.shockType||p.shockType)==='coil';
+ $('appBikeTitle').textContent=p.name;
+ $('dashBikeTitle').textContent=p.sub;
+ $('dashSavedDate').textContent=shortDate(c.date);
+ $('dashForkDesc').textContent=(c.forkModel||p.fork)+' · '+(c.forkTravel||p.forkTravel)+' mm · '+displayNum(c.spacers)+' spacer';
+ $('dashShockDesc').textContent=c.shockModel||p.shock;
+ $('dashShockLabel').textContent=coil?'Spring':'Shock';
+ $('dashShockUnit').textContent=coil?'lb/in':'psi';
+ $('dashForkPsi').textContent=displayNum(c.forkPsi);
+ $('dashShockPsi').textContent=coil?displayNum(c.springRate):displayNum(c.shockPsi);
+ $('dashFrontPsi').textContent=displayNum(c.frontPsi);
+ $('dashRearPsi').textContent=displayNum(c.rearPsi);
+ $('dashFrontTire').textContent=c.frontTire||'Unrecorded';
+ $('dashRearTire').textContent=c.rearTire||'Unrecorded';
+ $('dashGeometry').textContent=c.geometry||'—';
+ $('dashForkSag').textContent=Number.isFinite(c.forkSagMm)&&c.forkTravel?c.forkSagMm+' mm / '+(100*c.forkSagMm/c.forkTravel).toFixed(1)+'%':'Sag not measured';
+ $('dashShockSag').textContent=Number.isFinite(c.shockSagMm)&&c.shockStroke?c.shockSagMm+' mm / '+(100*c.shockSagMm/c.shockStroke).toFixed(1)+'%':'Sag not measured';
+ for(const [id,key] of [['dashHSC','hsc'],['dashLSC','lsc'],['dashHSR','hsr'],['dashLSR','lsr'],
+  ['dashShockHSC','shockHsc'],['dashShockLSC','shockLsc'],['dashShockHSR','shockHsr'],['dashShockLSR','shockLsr']]){
+   $(id).textContent=displayNum(c[key]);
+ }
+ for(const [id,key] of [['dashFMax','hsc'],['dashFlMax','lsc'],['dashFrMax','hsr'],['dashFlrMax','lsr']]){
+   $(id).textContent='/ '+(p.limits[key]??'—');
+ }
+ $('dashProgression').textContent=c.progression||'—';
+ $('dashHBO').textContent=coil?'HBO '+displayNum(c.hbo):'';
+ $('dashHBO').style.display=coil?'':'none';
+ $('dashBrakePads').textContent=c.brakePads||(activeBike==='bullit'?'TRP red semi-metallic':'Unrecorded');
+ $('dashRotorSize').textContent=c.rotors||(activeBike==='bullit'?'TRP 223 / 223 mm':'Unrecorded');
+ $('dashHub').textContent=activeBike==='bullit'?'20° last confirmed':'Unrecorded';
+ $('dashSetupButton').textContent='Edit '+p.label+' setup';
+ const open=todos.filter(t=>!t.done).length;
+ $('todoCountChip').textContent=open+' to-do'+(open===1?'':'s');
+ const last=rides[0]||c,a=last.after||{};
+ const afterBits=[a.overall,a.next?'Next: '+a.next:''].filter(Boolean);
+ const shockLabel=(last.shockType||p.shockType)==='coil'?
+   displayNum(last.springRate)+' lb/in':displayNum(last.shockPsi)+' psi';
+ $('lastRideCard').innerHTML='<div class="row"><div><div class="kicker">'+esc(prettyDate(last.date))+'</div><h3>'+esc(last.location||'Saved setup')+'</h3></div><div style="font-size:24px">›</div></div>'+
+   '<div class="chips"><span class="chip">Fork '+esc(displayNum(last.forkPsi))+' psi</span><span class="chip">Shock '+esc(shockLabel)+'</span><span class="chip">'+esc(last.progression||'—')+'</span></div>'+
+   '<div class="note" style="margin-top:10px;color:#cfd1d5;font-size:13px">'+(afterBits.length?esc(afterBits.join(' · ')):'Use this as the starting point for the next ride.')+'</div>';
 }
-
 function afterHasData(a={}){return !!(a.overall||a.bottom||a.forkTravel||a.shockTravel||a.feel||a.worked||a.didnt||a.next||a.notes);}
 function renderRides(){
   $('rideList').innerHTML=rides.map((r,i)=>{
@@ -216,7 +225,7 @@ function renderRides(){
     const after=afterHasData(a)?`<div class="after-summary"><div class="line"><strong>After ride${a.overall?` · ${esc(a.overall)}`:''}</strong></div>${a.feel?`<div class="line">${esc(a.feel)}</div>`:''}${a.next?`<div class="line"><strong>Next:</strong> ${esc(a.next)}</div>`:''}</div>`:'';
     return `<div class="ride-card">
       <div class="row"><div><div class="date">${esc(prettyDate(r.date))}</div><div class="meta">${esc(r.location||'Ride')}${r.conditions?` · ${esc(r.conditions)}`:''}</div></div>${i===0?'<span class="status-pill"><span class="status-dot"></span>Latest ride</span>':''}</div>
-      <div class="chips"><span class="chip">Fork ${esc(r.forkPsi)} psi</span><span class="chip">HSC ${esc(r.hsc)}/11</span><span class="chip">LSR ${esc(r.lsr)}/15</span><span class="chip">Shock ${esc(r.shockPsi)} psi</span><span class="chip">S LSR ${esc(r.shockLsr ?? '—')}</span><span class="chip">${esc(r.progression)}</span></div>
+      <div class="chips"><span class="chip">Fork ${esc(displayNum(r.forkPsi))} psi</span><span class="chip">HSC ${esc(displayNum(r.hsc))}</span><span class="chip">LSR ${esc(displayNum(r.lsr))}</span><span class="chip">Shock ${esc((r.shockType||profile().shockType)==='coil'?displayNum(r.springRate)+' lb/in':displayNum(r.shockPsi)+' psi')}</span><span class="chip">S LSR ${esc(displayNum(r.shockLsr))}</span><span class="chip">${esc(r.progression||'—')}</span></div>
       ${r.notes?`<div class="note">${esc(r.notes)}</div>`:''}${after}
       <div class="ride-actions"><button data-edit-ride="${esc(r.id)}">${afterHasData(a)?'Edit ride':'Add after-ride notes'}</button></div>
     </div>`;
@@ -275,6 +284,7 @@ function comparisonRangeRow(label,y,range,max,note,maxLabel=''){
   return '<div class="compare-row"><div class="compare-top"><div class="setting">'+esc(label)+'</div><div class="your">'+esc(y+maxLabel)+'</div><div class="base">'+esc(lo+'–'+hi+maxLabel)+'</div><div class="delta '+color+'">'+esc(delta===0?'0':(delta>0?'+':'')+delta)+'</div></div><div class="barwrap"><div class="barfill" style="width:'+pos(y,max)+'%"></div><div class="baseline" style="left:'+pos(mid,max)+'%"></div><div class="mine-dot" style="left:'+pos(y,max)+'%"></div></div><div class="row-note">'+esc(note)+'</div></div>';
 }
 function renderSetup(){
+  if(activeBike!=='bullit'){renderOtherBikeSetup();return;}
   const c=current(),f=forkBaseline[baseline],s=shockBaseline[baseline];
   const sc=baseline==='sc',fox=sc?null:foxX2Baseline(Number(c.shockPsi));
   const clicks='All click counts OUT from fully clockwise closed. Positive compression Δ = softer; positive rebound Δ = faster.';
@@ -306,6 +316,50 @@ function renderSetup(){
     comparisonRow('HSR',c.shockHsr,sc?s.hsr:(fox?.hsr??null),7,(sc?'Santa Cruz X01. ':foxRange)+clicks,'','/7')+
     comparisonRow('LSR',c.shockLsr,sc?s.lsr:(fox?.lsr??null),16,(sc?'Santa Cruz X01. ':foxRange)+clicks,'','/16');
 }
+function otherRow(label,value,note){
+ return '<div class="compare-row"><div class="compare-top"><div class="setting">'+esc(label)+'</div><div class="your">'+esc(value)+'</div><div class="base">—</div><div class="delta neutral">—</div></div><div class="row-note">'+esc(note)+'</div></div>';
+}
+function renderOtherBikeSetup(){
+ const c=current(),p=profile(),stroke=c.shockStroke||p.shockStroke;
+ $('suspensionReference').textContent=p.name+' · Current settings only. Manufacturer baseline not yet verified; never reuse Bullit-specific pressure, damping or torque values.';
+ $('forkRows').innerHTML=[
+  otherRow('Air pressure',displayNum(c.forkPsi)+' psi',c.forkModel||p.fork),
+  otherRow('Sag',Number.isFinite(c.forkSagMm)&&c.forkTravel?c.forkSagMm+' mm / '+(100*c.forkSagMm/c.forkTravel).toFixed(1)+'%':'Not measured',(c.forkTravel||p.forkTravel)+' mm travel'),
+  ...[['HSC',c.hsc],['LSC',c.lsc],['HSR',c.hsr],['LSR',c.lsr]].map(([k,v])=>otherRow(k,displayNum(v)+' out','Clicks OUT from fully closed'))
+ ].join('');
+ $('shockRows').innerHTML=[
+  otherRow((c.shockType||p.shockType)==='coil'?'Spring rate':'Air pressure',(c.shockType||p.shockType)==='coil'?displayNum(c.springRate)+' lb/in':displayNum(c.shockPsi)+' psi',c.shockModel||p.shock),
+  otherRow('Sag',Number.isFinite(c.shockSagMm)&&stroke?c.shockSagMm+' mm / '+(100*c.shockSagMm/stroke).toFixed(1)+'%':'Not measured',stroke?stroke+' mm stroke':'Enter shock stroke'),
+  ...[['HSC',c.shockHsc],['LSC',c.shockLsc],['HSR',c.shockHsr],['LSR',c.shockLsr]].map(([k,v])=>otherRow(k,displayNum(v)+' out','Clicks OUT from fully closed')),
+  ...((c.shockType||p.shockType)==='coil'?[otherRow('HBO',displayNum(c.hbo)+' out','Hydraulic bottom-out')]:[]),
+  otherRow('Geometry',c.geometry||'—','Current frame configuration'),
+  otherRow('Progression',c.progression||'—','Current suspension configuration')
+ ].join('');
+}
+function renderProfileSpecs(){
+ const bullit=activeBike==='bullit',c=current(),p=profile();
+ for(const id of ['bullitBuildCard','bullitFactoryCard','bullitGeometryCard','bullitFrameFacts','torqueList','bullitComponentDetails']){
+   const el=$(id);if(el)el.style.display=bullit?'':'none';
+ }
+ for(const id of ['otherBikeBuild','otherBikeGeometry','otherBikeTorque','otherBikeComponents']){
+   const el=$(id);if(el)el.style.display=bullit?'none':'';
+ }
+ if(bullit)return;
+ const rows=[
+  ['Bike',p.name],['Recorded size',p.size],
+  ['Fork',c.forkModel||p.fork],['Fork travel',displayNum(c.forkTravel||p.forkTravel)+' mm'],
+  ['Rear shock',c.shockModel||p.shock],['Shock stroke',c.shockStroke?c.shockStroke+' mm':'Unrecorded'],
+  ['Shock type',c.shockType||p.shockType],['Coil spring',(c.shockType||p.shockType)==='coil'?displayNum(c.springRate)+' lb/in':'N/A'],
+  ['Front tire',c.frontTire||'Unrecorded'],['Rear tire',c.rearTire||'Unrecorded'],
+  ['Brakes',c.brakePads||'Unrecorded'],['Rotors',c.rotors||'Unrecorded'],
+  ['Geometry',c.geometry||'Unrecorded'],['Progression',c.progression||'Unrecorded']
+ ];
+ $('otherBikeBuild').innerHTML='<div class="card"><h3>'+esc(p.name)+'</h3><div class="spec-list">'+rows.map(([name,val])=>'<div class="spec-row"><span>'+esc(name)+'</span><strong>'+esc(val)+'</strong></div>').join('')+'</div><div class="data-note">These are previously recorded settings. Verify any uncertain components before relying on them.</div></div>';
+ $('otherBikeGeometry').innerHTML='<div class="card"><h3>'+esc(p.label)+' geometry</h3><div class="spec-row"><span>Current geometry</span><strong>'+esc(c.geometry||'Unrecorded')+'</strong></div><div class="spec-row"><span>Progression</span><strong>'+esc(c.progression||'Unrecorded')+'</strong></div><div class="data-note">Manufacturer geometry reference pending verification.</div></div>';
+ $('otherBikeTorque').innerHTML='<div class="card"><h3>Torque specs</h3><div class="data-note">Not yet verified for '+esc(p.label)+'. Bullit-specific torque values are hidden.</div></div>';
+ $('otherBikeComponents').innerHTML='<div class="card"><h3>Components</h3><div class="spec-row"><span>Fork</span><strong>'+esc(c.forkModel||p.fork)+'</strong></div><div class="spec-row"><span>Rear shock</span><strong>'+esc(c.shockModel||p.shock)+'</strong></div><div class="data-note">Use Edit current setup on the dashboard to update components, then log work under Service.</div></div>';
+}
+
 function renderTodos(){
   const sorted=[...todos].sort((a,b)=>Number(a.done)-Number(b.done)||String(b.createdAt||'').localeCompare(String(a.createdAt||'')));
   const open=sorted.filter(t=>!t.done).length;
@@ -317,7 +371,7 @@ function renderTodos(){
 function renderMaintenance(){
   $('maintenanceList').innerHTML=maintenance.map(m=>`<div class="ride-card"><div class="row"><div><div class="date">${esc(prettyDate(m.date))}</div><div class="meta">${esc(m.category||'Maintenance')}</div></div></div><div class="note">${esc(m.note)}</div></div>`).join('')||'<div class="empty">No maintenance entries yet.</div>';
 }
-function renderAll(){renderDashboard();renderRides();renderSetup();renderTodos();renderMaintenance();}
+function renderAll(){renderDashboard();renderRides();renderSetup();renderTodos();renderMaintenance();renderProfileSpecs();}
 
 function clearRideForm(){
   ['afterOverall','afterBottom','afterForkTravel','afterShockTravel','afterFeel','afterWorked','afterDidnt','afterNext','afterNotes'].forEach(id=>{const el=$(id);if(el)el.value='';});
