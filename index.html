@@ -589,10 +589,11 @@
     </div>
 
     <div class="field"><label>Shock damping · clicks OUT from closed</label>
+      <div class="data-note" id="shockAdjusterNote" style="display:none">RockShox Vivid Ultimate DH has ONE rebound knob (LSR). On C1 models, HSC/LSC use a CENTER 0 reference, unlike FOX clicks-out. The saved numbers reproduce your notes; confirm your exact shock revision before adjusting.</div>
       <div class="fieldgrid">
         <div class="stepper" data-target="shockHsc" data-step="1"><button>-</button><div class="stepvalue">HSC <span id="shockHsc">4</span></div><button>+</button></div>
         <div class="stepper" data-target="shockLsc" data-step="1"><button>-</button><div class="stepvalue">LSC <span id="shockLsc">5</span></div><button>+</button></div>
-        <div class="stepper" data-target="shockHsr" data-step="1"><button>-</button><div class="stepvalue">HSR <span id="shockHsr">3</span></div><button>+</button></div>
+        <div class="stepper" id="shockHsrEditor" data-target="shockHsr" data-step="1"><button>-</button><div class="stepvalue">HSR <span id="shockHsr">3</span></div><button>+</button></div>
         <div class="stepper" data-target="shockLsr" data-step="1"><button>-</button><div class="stepvalue">LSR <span id="shockLsr">11</span></div><button>+</button></div>
       </div>
     </div>
