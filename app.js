@@ -518,6 +518,7 @@ function fillRideForm(r){
   $('progressionText').value=r.progression||'';
   $('nonBullitFlipFields').style.display=activeBike==='bullit'?'none':'';
   $('shockAdjusterNote').style.display=activeBike==='supreme'?'':'none';
+  $('shockHsrEditor').style.display=activeBike==='supreme'?'none':'';
   $('bullitFlipFields').style.display=activeBike==='bullit'?'':'none';
   updateShockTypeUI();
   $('forkSagMm').value=Number.isFinite(r.forkSagMm)?r.forkSagMm:'';
