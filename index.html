@@ -197,15 +197,15 @@
         <div class="bike-dot">B</div>
         <div class="titlewrap">
           <div class="eyebrow">Bike Setup</div>
-          <div class="title">2026 Santa Cruz Bullit</div>
+          <div class="title" id="appBikeTitle">2026 Santa Cruz Bullit</div>
         </div>
       </div>
       <button class="iconbtn" id="headerAdd" aria-label="New ride">＋</button>
     </div>
     <div class="bike-tabs">
-      <button class="bike-tab active">Bullit</button>
-      <button class="bike-tab disabled" title="Coming after Bullit format is approved">Supreme V5</button>
-      <button class="bike-tab disabled" title="Coming after Bullit format is approved">Nomad</button>
+      <button class="bike-tab active" data-bike="bullit">Bullit</button>
+      <button class="bike-tab" data-bike="supreme">Supreme V5</button>
+      <button class="bike-tab" data-bike="nomad">Nomad</button>
     </div>
   </header>
 
@@ -213,7 +213,7 @@
     <section id="dashboard" class="screen active">
       <div class="hero">
         <div class="small">CURRENT SETUP</div>
-        <h1>Bullit 4 · MX 170</h1>
+        <h1 id="dashBikeTitle">Bullit 4 · MX 170</h1>
         <p>Last setup saved <span id="dashSavedDate">Sep 30</span> · clicks are OUT from fully closed</p>
 
         <div class="current-grid">
@@ -222,26 +222,26 @@
               <div><div class="label">Fork</div><div class="value"><span id="dashForkPsi">99</span><span class="unit">psi</span></div></div>
               <span class="status-pill"><span class="status-dot"></span>Saved</span>
             </div>
-            <div class="sub">FOX 38 GRIP X2 · 170 mm · 1 spacer</div><div class="sub" id="dashForkSag">Sag not measured</div>
+            <div class="sub" id="dashForkDesc">FOX 38 GRIP X2 · 170 mm · 1 spacer</div><div class="sub" id="dashForkSag">Sag not measured</div>
             <div class="damping-grid">
-              <div class="damping-item"><span>HSC</span><strong id="dashHSC">8 / 11</strong></div>
-              <div class="damping-item"><span>LSC</span><strong id="dashLSC">10 / 18</strong></div>
-              <div class="damping-item"><span>HSR</span><strong id="dashHSR">6 / 8</strong></div>
-              <div class="damping-item"><span>LSR</span><strong id="dashLSR">6 / 15</strong></div>
+              <div class="damping-item"><span>HSC</span><strong><span id="dashHSC">10</span><small id="dashFMax">/ 11</small></strong></div>
+              <div class="damping-item"><span>LSC</span><strong><span id="dashLSC">10</span><small id="dashFlMax">/ 18</small></strong></div>
+              <div class="damping-item"><span>HSR</span><strong><span id="dashHSR">6</span><small id="dashFrMax">/ 8</small></strong></div>
+              <div class="damping-item"><span>LSR</span><strong><span id="dashLSR">5</span><small id="dashFlrMax">/ 15</small></strong></div>
             </div>
           </div>
 
           <div class="setup-summary">
             <div class="setup-summary-head">
-              <div><div class="label">Shock</div><div class="value"><span id="dashShockPsi">200</span><span class="unit">psi</span></div></div>
+              <div><div class="label" id="dashShockLabel">Shock</div><div class="value"><span id="dashShockPsi">205</span><span class="unit" id="dashShockUnit">psi</span></div></div>
               <span class="chip" id="dashProgression">HI</span>
             </div>
-            <div class="sub">2026 FOX FLOAT X2 · 205×65 · Bullit tune</div><div class="sub" id="dashShockSag">Recheck sag</div>
+            <div class="sub" id="dashShockDesc">2026 FOX FLOAT X2 · 205×65 · Bullit tune</div><div class="sub" id="dashShockSag">Recheck sag</div>
             <div class="damping-grid">
               <div class="damping-item"><span>HSC</span><strong id="dashShockHSC">4</strong></div>
               <div class="damping-item"><span>LSC</span><strong id="dashShockLSC">5</strong></div>
               <div class="damping-item"><span>HSR</span><strong id="dashShockHSR">3</strong></div>
-              <div class="damping-item"><span>LSR</span><strong id="dashShockLSR">11</strong></div>
+              <div class="damping-item"><span>LSR</span><strong id="dashShockLSR">11</strong></div><div class="damping-item"><span id="dashHBO" style="display:none"></span></div>
             </div>
           </div>
 
@@ -256,14 +256,14 @@
           <div class="setup-summary wide">
             <div class="setup-summary-head"><div class="label">Bike setup</div><span class="chip" id="todoCountChip">4 to-do</span></div>
             <div class="setup-lines">
-              <div class="setup-line"><span>Brake pads</span><strong>TRP red semi-metallic</strong></div><div class="setup-line"><span>Chainstay geometry</span><strong id="dashGeometry">LO</strong></div>
-              <div class="setup-line"><span>Rotors</span><strong>TRP 223 / 223 mm</strong></div>
-              <div class="setup-line"><span>Anti-pedal kickback</span><strong>20°</strong></div>
+              <div class="setup-line"><span>Brake pads</span><strong id="dashBrakePads">TRP red semi-metallic</strong></div><div class="setup-line"><span>Chainstay geometry</span><strong id="dashGeometry">LO</strong></div>
+              <div class="setup-line"><span>Rotors</span><strong id="dashRotorSize">TRP 223 / 223 mm</strong></div>
+              <div class="setup-line"><span>Anti-pedal kickback / hub</span><strong id="dashHub">20°</strong></div>
             </div>
           </div>
         </div>
 
-        <div class="action-grid" style="margin-top:12px"><button class="primary" id="editCurrentSetup">Edit current setup</button><button class="secondary" data-go="setup">Compare baseline</button></div>
+        <div class="action-grid" style="margin-top:12px"><button class="primary" id="editCurrentSetup"><span id="dashSetupButton">Edit current setup</span></button><button class="secondary" data-go="setup">Compare baseline</button></div>
       </div>
 
       <div class="section-title"><h2>Last ride</h2><button data-go="rides">History</button></div>
@@ -285,11 +285,11 @@
       <div class="setup-head">
         <div><h2>Suspension</h2><p>Current vs manufacturer starting point</p></div>
       </div>
-      <div class="seg" style="margin-bottom:10px"><button class="baseline-btn active" data-baseline="sc">Santa Cruz · 185 lb</button><button class="baseline-btn" data-baseline="fox">FOX manual</button></div>
+      <div class="seg" id="baselineSelector" style="margin-bottom:10px"><button class="baseline-btn active" data-baseline="sc">Santa Cruz · 185 lb</button><button class="baseline-btn" data-baseline="fox">FOX manual</button></div>
        <div class="data-note" id="suspensionReference" style="margin-bottom:14px"></div>
 
       <div class="component-card" id="forkCard">
-        <div class="component-header"><div><div class="name">Fork</div><div class="desc">FOX 38 · GRIP X2 · 170 mm</div></div><div class="status-pill"><span class="status-dot"></span>Current</div></div>
+        <div class="component-header"><div><div class="name">Fork</div><div class="desc" id="setupForkDesc">FOX 38 · GRIP X2 · 170 mm</div></div><div class="status-pill"><span class="status-dot"></span>Current</div></div>
         <div class="compare-labels" style="padding:10px 15px 0"><span>Setting</span><span>Your</span><span>Baseline</span><span>Δ</span></div>
         <div id="forkRows"></div>
         <div class="assessment">
@@ -301,7 +301,7 @@
       </div>
 
       <div class="component-card" id="shockCard">
-        <div class="component-header"><div><div class="name">Shock</div><div class="desc">2026 FOX FLOAT X2 · 205×65 · Bullit tune</div></div><div class="status-pill"><span class="status-dot"></span>Current</div></div>
+        <div class="component-header"><div><div class="name">Shock</div><div class="desc" id="setupShockDesc">2026 FOX FLOAT X2 · 205×65 · Bullit tune</div></div><div class="status-pill"><span class="status-dot"></span>Current</div></div>
         <div class="compare-labels" style="padding:10px 15px 0"><span>Setting</span><span>Your</span><span>Baseline</span><span>Δ</span></div>
         <div id="shockRows"></div>
         <div class="assessment">
@@ -329,14 +329,14 @@
         <div class="mini-list">
           <div class="mini-line"><span>Storage</span><strong>Local on this iPhone</strong></div>
           <div class="mini-line"><span>Offline</span><strong>Yes after first load</strong></div>
-          <div class="mini-line"><span>Version</span><strong>0.3 PWA</strong></div>
+          <div class="mini-line"><span>Version</span><strong>0.4 PWA</strong></div>
         </div>
         <div class="action-grid" style="margin-top:14px">
           <button class="secondary" id="exportBtn">Export backup</button>
           <button class="secondary" id="importBtn">Import backup</button>
         </div>
         <input id="importFile" type="file" accept="application/json,.json" hidden />
-        <div class="data-note">On iPhone: open the hosted app in Safari → Share → Add to Home Screen. Export a JSON backup periodically so your ride history is not dependent on browser storage alone.</div>
+        <div class="data-note"><b>All-bike backup:</b> Export includes Bullit, Nomad, Supreme setups, rides, service and to-dos in one JSON file. Save to iCloud Drive. Import of a v0.4 backup replaces all bikes; older Bullit-only backups replace Bullit records only.</div>
       </div>
     </section>
 
@@ -350,7 +350,8 @@
       </div>
 
       <div class="subview active" id="spec-build">
-        <div class="card">
+        <div id="otherBikeBuild" style="display:none"></div>
+        <div class="card" id="bullitBuildCard">
           <div class="row"><div><div class="kicker">My current build</div><h3>2026 Bullit GX · Large</h3></div><span class="source-pill">Current</span></div>
           <div class="spec-list" style="margin-top:8px">
             <div class="spec-row"><span>Wheel setup</span><strong>29" front / 27.5" rear</strong></div>
@@ -366,8 +367,8 @@
           </div>
         </div>
 
-        <div class="section-title"><h2>Factory reference</h2></div>
-        <div class="card">
+        <div class="section-title" id="bullitFactoryTitle"><h2>Factory reference</h2></div>
+        <div class="card" id="bullitFactoryCard">
           <div class="row"><div><div class="kicker">Santa Cruz</div><h3>2026 Bullit GX AXS</h3></div><span class="source-pill">Factory</span></div>
           <div class="spec-list" style="margin-top:8px">
             <div class="spec-row"><span>Frame</span><strong>Carbon C · MX · 170 mm</strong></div>
@@ -385,7 +386,8 @@
       </div>
 
       <div class="subview" id="spec-geometry">
-        <div class="card">
+        <div id="otherBikeGeometry" style="display:none"></div>
+        <div class="card" id="bullitGeometryCard">
           <div class="row"><div><div class="kicker">2026 Bullit 4</div><h3>Large geometry</h3></div><span class="source-pill">Santa Cruz</span></div>
           <div class="geometry-head" style="margin-top:14px"><span>Measurement</span><span>HI</span><span>LO</span></div>
           <div class="geometry-row"><span>Reach</span><strong>480 mm</strong><strong>477 mm</strong></div>
@@ -404,8 +406,8 @@
           <div class="geometry-row"><span>Seat tube</span><strong>420 mm</strong><strong>420 mm</strong></div>
         </div>
 
-        <div class="section-title"><h2>Frame facts</h2></div>
-        <div class="card">
+        <div class="section-title" id="bullitFrameTitle"><h2>Frame facts</h2></div>
+        <div class="card" id="bullitFrameFacts">
           <div class="spec-list">
             <div class="spec-row"><span>Travel</span><strong>170 mm front / rear</strong></div>
             <div class="spec-row"><span>Fork offset</span><strong>44 mm</strong></div>
@@ -422,7 +424,8 @@
       </div>
 
       <div class="subview" id="spec-torque">
-        <div class="torque-search"><input id="torqueSearch" type="text" placeholder="Search torque — shock, axle, stem, crank…" /></div>
+        <div id="otherBikeTorque" style="display:none"></div>
+        <div class="torque-search" id="bullitTorqueSearch"><input id="torqueSearch" type="text" placeholder="Search torque — shock, axle, stem, crank…" /></div>
         <div id="torqueList">
           <div class="torque-group" data-torque-group>
             <div class="torque-group-title"><h3>Frame & suspension</h3><span class="source-pill">Santa Cruz</span></div>
@@ -456,6 +459,7 @@
       </div>
 
       <div class="subview" id="spec-components">
+        <div id="otherBikeComponents" style="display:none"></div>
         <details class="card component-detail" open>
           <summary><div class="detail-head"><div><div class="kicker">Fork</div><h3>FOX 38 Performance Elite · GRIP X2</h3></div><span class="detail-arrow">›</span></div></summary>
           <div class="data-note">2026 · 170 mm · FLOAT NA2 · lower-leg quick reference</div>
@@ -608,7 +612,7 @@
   </div>
 </div>
 
-<script src="app.js?v=0.3.0"></script>
+<script src="app.js?v=0.4.0"></script>
 
 </body>
 </html>
