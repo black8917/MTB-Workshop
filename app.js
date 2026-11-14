@@ -1,12 +1,13 @@
 'use strict';
 
-const APP_VERSION = '0.3.0';
+const APP_VERSION = '0.4.0';
 const DB_NAME = 'BikeWorkshopPWA';
 const DB_VERSION = 1;
 let db;
 let rides = [];
 let todos = [];
 let maintenance = [];
+let activeBike = 'bullit';
 let progression = 'LO';
 let geometry = 'LO';
 let setupOverride = null;
@@ -50,6 +51,22 @@ const DEFAULT_CURRENT_SETUP = {
   "notes": "Current setup reported Nov 13. Recheck shock sag after changing pressure to 205 psi and shock progression to LOW.",
   "after": {}
 };
+
+
+const BIKE_PROFILES={
+ bullit:{label:'Bullit',name:'2026 Santa Cruz Bullit',sub:'Bullit 4 · MX 170',size:'Large',fork:'FOX 38 Performance Elite GRIP X2',shock:'2026 FOX FLOAT X2 · X01 tune',forkTravel:170,shockStroke:65,shockType:'air',limits:{hsc:11,lsc:18,hsr:8,lsr:15,shockHsc:9,shockLsc:19,shockHsr:7,shockLsr:16}},
+ nomad:{label:'Nomad',name:'2023 Santa Cruz Nomad V6',sub:'Nomad V6 · Enduro',size:'Unverified',fork:'FOX 38 Performance Elite GRIP X2',shock:'Rear shock model to confirm',forkTravel:180,shockStroke:null,shockType:'air',limits:{hsc:11,lsc:18,hsr:8,lsr:15}},
+ supreme:{label:'Supreme V5',name:'2026 Commencal Supreme DH V5',sub:'Supreme DH V5 · 220 rear',size:'Large (Aug 2026 record)',fork:'2027 FOX 40 Factory GRIP X2',shock:'RockShox Vivid Ultimate DH Coil 250×75',forkTravel:203,shockStroke:75,shockType:'coil',limits:{hsc:11,lsc:18,hsr:9,lsr:16}}
+};
+const FIRST_SETUP={
+ nomad:{bikeId:'nomad',id:'nomad_current',date:'2026-11-14',location:'Current setup',frontPsi:null,rearPsi:null,frontTire:'Not recorded',rearTire:'Not recorded',forkPsi:85,forkTravel:180,spacers:1,forkSagMm:null,shockPsi:null,shockStroke:null,shockSagMm:null,shockType:'air',springRate:null,hbo:null,forkModel:'FOX 38 Performance Elite GRIP X2',shockModel:'Rear shock model to confirm',hsc:6,lsc:10,hsr:5,lsr:6,shockHsc:null,shockLsc:null,shockHsr:null,shockLsr:null,geometry:'Unrecorded',progression:'Unrecorded',notes:'Historical Nomad notes: fork recorded; rear shock, tires and remaining settings need verification.',after:{}},
+ supreme:{bikeId:'supreme',id:'supreme_current',date:'2026-11-14',location:'Current setup',frontPsi:27,rearPsi:30,frontTire:'Model to confirm · CushCore front',rearTire:'Model to confirm',forkPsi:85,forkTravel:203,spacers:2,forkSagMm:null,shockPsi:null,shockStroke:75,shockSagMm:null,shockType:'coil',springRate:550,hbo:3,forkModel:'2027 FOX 40 Factory GRIP X2',shockModel:'RockShox Vivid Ultimate DH Coil 250×75',hsc:5,lsc:9,hsr:8,lsr:9,shockHsc:1,shockLsc:0,shockHsr:null,shockLsr:4,geometry:'HIGH',progression:'LINEAR',notes:'Latest recorded Supreme: 550 lb/in spring supersedes older 500; High/Linear. Earlier ~17% sag requires recheck.',after:{}}
+};
+const profile=()=>BIKE_PROFILES[activeBike];
+const setupKey=(id=activeBike)=>id==='bullit'?'currentSetupV2':'currentSetupV4_'+id;
+const displayNum=v=>Number.isFinite(v)?String(v):'—';
+const nullableNum=v=>v===null||v===''||v===undefined?null:Number(v);
+const fieldNumber=id=>{const t=$(id).textContent.trim();return t==='—'||t===''?null:Number(t);};
 
 const baseRides = [
   {id:'seed_20260930',date:'2026-09-30',createdAt:'2026-09-30T12:00:00',location:'Current setup',conditions:'',frontPsi:27,rearPsi:30,forkPsi:99,forkTravel:170,spacers:1,shockPsi:200,hsc:8,lsc:10,hsr:6,lsr:6,shockHsc:4,shockLsc:5,shockHsr:3,shockLsr:11,progression:'HI',notes:'Latest saved Bullit suspension setup. Shock LSC carried forward from Sep 9 because the Sep 30 note is blank.',after:{}},
@@ -120,19 +137,35 @@ async function seedIfNeeded(){
       await put('todos',{id:'todo_bosch_500008',text:'Investigate Bosch fault 500008',detail:'After downhill coasting, cranks have sometimes spun without moving chainring; intermittent delayed engagement, clunk and whir.',done:false,createdAt:'2026-11-13T22:30:00'});
     await put('meta',{key:'serviceMigrationV2',value:true});
   }
+
+  // Non-destructive v0.4 migration: untagged legacy records belong to Bullit.
+  if(!(await getMeta('bikeMigrationV4'))){
+    for(const store of ['rides','todos','maintenance']){
+      for(const item of await getAll(store))if(!item.bikeId)await put(store,{...item,bikeId:'bullit'});
+    }
+    for(const id of ['nomad','supreme'])if(!(await getMeta(setupKey(id))))
+      await put('meta',{key:setupKey(id),value:FIRST_SETUP[id]});
+    await put('meta',{key:'bikeMigrationV4',value:true});
+  }
   await put('meta',{key:'appVersion',value:APP_VERSION});
 }
 
 function sortRides(arr){return [...arr].sort((a,b)=>String(b.date).localeCompare(String(a.date)) || String(b.createdAt||'').localeCompare(String(a.createdAt||'')));}
 function sortMaintenance(arr){return [...arr].sort((a,b)=>String(b.date).localeCompare(String(a.date)) || String(b.createdAt||'').localeCompare(String(a.createdAt||'')));}
 async function reload(){
-  rides=sortRides(await getAll('rides'));
-  todos=await getAll('todos');
-  maintenance=sortMaintenance(await getAll('maintenance'));
-  setupOverride=await getMeta('currentSetupV2');
+  rides=sortRides((await getAll('rides')).filter(r=>(r.bikeId||'bullit')===activeBike));
+  todos=(await getAll('todos')).filter(t=>(t.bikeId||'bullit')===activeBike);
+  maintenance=sortMaintenance((await getAll('maintenance')).filter(m=>(m.bikeId||'bullit')===activeBike));
+  setupOverride=await getMeta(setupKey());
   renderAll();
 }
-const current=()=>setupOverride||rides[0]||DEFAULT_CURRENT_SETUP;
+const current=()=>setupOverride||rides[0]||(activeBike==='bullit'?DEFAULT_CURRENT_SETUP:FIRST_SETUP[activeBike]);
+async function switchBike(id){
+  if(!BIKE_PROFILES[id]||id===activeBike)return;
+  activeBike=id;await put('meta',{key:'activeBikeV4',value:id});
+  document.querySelectorAll('.bike-tab').forEach(b=>b.classList.toggle('active',b.dataset.bike===id));
+  await reload();go('dashboard');
+}
 function prettyDate(s){if(!s)return '—';const d=new Date(`${s}T12:00:00`);return d.toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'});}
 function shortDate(s){if(!s)return '—';const d=new Date(`${s}T12:00:00`);return d.toLocaleDateString(undefined,{month:'short',day:'numeric'});}
 
@@ -399,6 +432,7 @@ async function importBackup(file){
 }
 
 function wireEvents(){
+  document.querySelectorAll('.bike-tab').forEach(b=>b.onclick=()=>switchBike(b.dataset.bike));
   document.querySelectorAll('.navbtn').forEach(b=>b.onclick=()=>go(b.dataset.screen));
   document.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>go(b.dataset.go));
   [$('headerAdd'),$('newRideMain'),$('newRideRides'),$('fab')].forEach(b=>b&&(b.onclick=()=>openRide()));
@@ -422,7 +456,7 @@ function wireEvents(){
 
 async function init(){
   try{
-    db=await openDB();await seedIfNeeded();wireEvents();await reload();
+    db=await openDB();await seedIfNeeded();wireEvents();activeBike=(await getMeta('activeBikeV4'))||'bullit';if(!BIKE_PROFILES[activeBike])activeBike='bullit';document.querySelectorAll('.bike-tab').forEach(b=>b.classList.toggle('active',b.dataset.bike===activeBike));await reload();
   }catch(err){console.error(err);alert('Bike Workshop could not open local storage. Try reloading the page.');}
   if('serviceWorker' in navigator){navigator.serviceWorker.register('./sw.js').catch(err=>console.warn('Service worker registration failed',err));}
 }
