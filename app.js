@@ -1,6 +1,6 @@
 'use strict';
 
-const APP_VERSION = '0.4.0';
+const APP_VERSION = '0.4.1';
 const DB_NAME = 'BikeWorkshopPWA';
 const DB_VERSION = 1;
 let db;
@@ -398,6 +398,11 @@ function fillRideForm(r){
   $('shockHbo').value=Number.isFinite(r.hbo)?r.hbo:'';
   $('forkTravelMm').value=r.forkTravel||profile().forkTravel||'';
   $('shockStrokeMm').value=r.shockStroke||profile().shockStroke||'';
+  $('spacersInput').value=Number.isFinite(r.spacers)?r.spacers:'';
+  $('forkTravelNote').textContent=r.forkTravel||profile().forkTravel||'—';
+  $('shockStrokeNote').textContent=r.shockStroke||profile().shockStroke||'—';
+  $('forkSagMm').max=r.forkTravel||profile().forkTravel||170;
+  $('shockSagMm').max=r.shockStroke||profile().shockStroke||65;
   $('brakePads').value=r.brakePads||(activeBike==='bullit'?'TRP red semi-metallic':'');
   $('rotorSpecs').value=r.rotors||(activeBike==='bullit'?'TRP 223 / 223 mm':'');
   $('geometryText').value=r.geometry||'';
@@ -454,7 +459,7 @@ async function saveRide(){
   const r={
     ...(old||current()),bikeId:activeBike,id:old?.id||uid('ride'),createdAt:old?.createdAt||new Date().toISOString(),
     date:$('rideDate').value||new Date().toISOString().slice(0,10),location:$('location').value.trim()||'Ride',conditions:$('conditions').value,notes:$('rideNotes').value.trim(),progression:activeBike==='bullit'?progression:$('progressionText').value.trim(),geometry:activeBike==='bullit'?geometry:$('geometryText').value.trim(),frontTire:$('frontTireModel').value.trim(),rearTire:$('rearTireModel').value.trim(),forkSagMm:$('forkSagMm').value.trim()===''?null:Number($('forkSagMm').value),shockSagMm:$('shockSagMm').value.trim()===''?null:Number($('shockSagMm').value),shockStroke:nullableNum($('shockStrokeMm').value),forkModel:$('forkModel').value.trim(),shockModel:$('shockModel').value.trim(),shockType:$('shockType').value,springRate:nullableNum($('shockSpringRate').value),hbo:nullableNum($('shockHbo').value),brakePads:$('brakePads').value.trim(),rotors:$('rotorSpecs').value.trim(),
-    frontPsi:fieldNumber('frontPsi'),rearPsi:fieldNumber('rearPsi'),forkPsi:fieldNumber('forkPsi'),forkTravel:nullableNum($('forkTravelMm').value),spacers:old?.spacers??1,shockPsi:fieldNumber('shockPsi'),
+    frontPsi:fieldNumber('frontPsi'),rearPsi:fieldNumber('rearPsi'),forkPsi:fieldNumber('forkPsi'),forkTravel:nullableNum($('forkTravelMm').value),spacers:nullableNum($('spacersInput').value),shockPsi:fieldNumber('shockPsi'),
     hsc:fieldNumber('hsc'),lsc:fieldNumber('lsc'),hsr:fieldNumber('hsr'),lsr:fieldNumber('lsr'),shockHsc:fieldNumber('shockHsc'),shockLsc:fieldNumber('shockLsc'),shockHsr:fieldNumber('shockHsr'),shockLsr:fieldNumber('shockLsr'),
     after:{overall:$('afterOverall').value,bottom:$('afterBottom').value,forkTravel:$('afterForkTravel').value.trim(),shockTravel:$('afterShockTravel').value.trim(),feel:$('afterFeel').value.trim(),worked:$('afterWorked').value.trim(),didnt:$('afterDidnt').value.trim(),next:$('afterNext').value.trim(),notes:$('afterNotes').value.trim()}
   };
@@ -530,7 +535,9 @@ function wireEvents(){
   [$('headerAdd'),$('newRideMain'),$('newRideRides'),$('fab')].forEach(b=>b&&(b.onclick=()=>openRide()));
   $('editCurrentSetup').onclick=openCurrentSetup;
   $('forkSagMm').oninput=updateSagDisplay;$('shockSagMm').oninput=updateSagDisplay;
-  $('forkTravelMm').oninput=updateSagDisplay;$('shockStrokeMm').oninput=updateSagDisplay;$('shockType').onchange=updateShockTypeUI;
+  $('forkTravelMm').oninput=()=>{$('forkTravelNote').textContent=$('forkTravelMm').value||'—';updateSagDisplay();};
+  $('shockStrokeMm').oninput=()=>{$('shockStrokeNote').textContent=$('shockStrokeMm').value||'—';updateSagDisplay();};
+  $('shockType').onchange=updateShockTypeUI;
   document.querySelectorAll('.geometry').forEach(b=>b.onclick=()=>{geometry=b.dataset.mode;document.querySelectorAll('.geometry').forEach(x=>x.classList.toggle('active',x===b));});
   $('cancelRide').onclick=closeRide;$('saveRide').onclick=saveRide;$('rideModal').onclick=e=>{if(e.target===$('rideModal'))closeRide();};
   document.querySelectorAll('.progression').forEach(b=>b.onclick=()=>{progression=b.dataset.mode;document.querySelectorAll('.progression').forEach(x=>x.classList.toggle('active',x===b));});
