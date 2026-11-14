@@ -329,7 +329,7 @@
         <div class="mini-list">
           <div class="mini-line"><span>Storage</span><strong>Local on this iPhone</strong></div>
           <div class="mini-line"><span>Offline</span><strong>Yes after first load</strong></div>
-          <div class="mini-line"><span>Version</span><strong>0.4 PWA</strong></div>
+          <div class="mini-line"><span>Version</span><strong>0.4.1 PWA</strong></div>
         </div>
         <div class="action-grid" style="margin-top:14px">
           <button class="secondary" id="exportBtn">Export backup</button>
@@ -558,6 +558,7 @@
       <div class="field"><label>Fork travel (mm)</label><input type="number" min="0" step="1" id="forkTravelMm" /></div>
       <div class="field"><label>Shock stroke (mm)</label><input type="number" min="0" step="0.5" id="shockStrokeMm" /></div>
     </div>
+    <div class="field"><label>Fork volume spacers / tokens</label><input type="number" min="0" step="1" id="spacersInput" /></div>
     <div class="fieldgrid">
       <div class="field"><label>Rear shock type</label><select id="shockType"><option value="air">Air</option><option value="coil">Coil</option></select></div>
       <div class="field" id="shockSpringField" style="display:none"><label>Spring (lb/in)</label><input type="number" min="0" step="25" id="shockSpringRate" /></div>
@@ -568,8 +569,8 @@
       <div class="field"><label>Rotors</label><input type="text" id="rotorSpecs" /></div>
     </div>
     <div class="fieldgrid">
-      <div class="field"><label>Fork sag (mm)</label><input type="number" min="0" max="170" step="0.5" inputmode="decimal" id="forkSagMm" placeholder="Not measured" /><div class="data-note">170 mm travel · <strong id="forkSagPct">—</strong> sag</div></div>
-      <div class="field"><label>Shock sag (mm)</label><input type="number" min="0" max="65" step="0.5" inputmode="decimal" id="shockSagMm" placeholder="Recheck (was 19 mm)" /><div class="data-note">65 mm stroke · <strong id="shockSagPct">—</strong> sag</div></div>
+      <div class="field"><label>Fork sag (mm)</label><input type="number" min="0" max="170" step="0.5" inputmode="decimal" id="forkSagMm" placeholder="Not measured" /><div class="data-note"><span id="forkTravelNote">170</span> mm travel · <strong id="forkSagPct">—</strong> sag</div></div>
+      <div class="field"><label>Shock sag (mm)</label><input type="number" min="0" max="65" step="0.5" inputmode="decimal" id="shockSagMm" placeholder="Recheck (was 19 mm)" /><div class="data-note"><span id="shockStrokeNote">65</span> mm stroke · <strong id="shockSagPct">—</strong> sag</div></div>
     </div>
     <div class="field"><label>Fork damping · clicks OUT from closed</label>
       <div class="fieldgrid">
@@ -633,7 +634,7 @@
   </div>
 </div>
 
-<script src="app.js?v=0.4.0"></script>
+<script src="app.js?v=0.4.1"></script>
 
 </body>
 </html>
