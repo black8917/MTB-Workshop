@@ -285,8 +285,15 @@
       <div class="setup-head">
         <div><h2>Suspension</h2><p>Current vs manufacturer starting point</p></div>
       </div>
-      <div class="seg" id="baselineSelector" style="margin-bottom:10px"><button class="baseline-btn active" data-baseline="sc">Santa Cruz · 185 lb</button><button class="baseline-btn" data-baseline="fox">FOX manual</button></div>
+      <div class="seg" id="baselineSelector" style="margin-bottom:10px"><button class="baseline-btn active" data-baseline="sc" id="baselineBrandLabel">Santa Cruz · 185 lb</button><button class="baseline-btn" data-baseline="fox" id="baselineManualLabel">FOX manual</button></div>
        <div class="data-note" id="suspensionReference" style="margin-bottom:14px"></div>
+       <div class="tiny" id="supremeSourceLinks" style="display:none;margin-bottom:14px">
+         References: <a href="https://www.commencal.com/en/frame-settings-supreme-dh-v5.html" target="_blank" rel="noopener noreferrer">Commencal Supreme DH V5 guide</a> ·
+         <a href="https://tech.ridefox.com/bike/owners-manuals/3102/fork--2026-40mm" target="_blank" rel="noopener noreferrer">FOX 2026 40 GRIP X2</a> ·
+         <a href="https://tech.ridefox.com/bike/owners-manuals/3167/fork--2027-40mm" target="_blank" rel="noopener noreferrer">FOX 2027 40 GRIP X2</a> ·
+         <a href="https://www.sram.com/en/rockshox/models/rs-vivc-udh-c1" target="_blank" rel="noopener noreferrer">RockShox Vivid Coil Ultimate DH</a>.
+         RockShox compression-adjuster reference may differ from Commencal's click counting; verify on hardware before translating numeric offsets.
+       </div>
 
       <div class="component-card" id="forkCard">
         <div class="component-header"><div><div class="name">Fork</div><div class="desc" id="setupForkDesc">FOX 38 · GRIP X2 · 170 mm</div></div><div class="status-pill"><span class="status-dot"></span>Current</div></div>
@@ -329,7 +336,7 @@
         <div class="mini-list">
           <div class="mini-line"><span>Storage</span><strong>Local on this iPhone</strong></div>
           <div class="mini-line"><span>Offline</span><strong>Yes after first load</strong></div>
-          <div class="mini-line"><span>Version</span><strong>0.4.1 PWA</strong></div>
+          <div class="mini-line"><span>Version</span><strong>0.4.2 PWA</strong></div>
         </div>
         <div class="action-grid" style="margin-top:14px">
           <button class="secondary" id="exportBtn">Export backup</button>
@@ -582,10 +589,11 @@
     </div>
 
     <div class="field"><label>Shock damping · clicks OUT from closed</label>
+      <div class="data-note" id="shockAdjusterNote" style="display:none">RockShox Vivid Ultimate DH has ONE rebound knob (LSR). On C1 models, HSC/LSC use a CENTER 0 reference, unlike FOX clicks-out. The saved numbers reproduce your notes; confirm your exact shock revision before adjusting.</div>
       <div class="fieldgrid">
         <div class="stepper" data-target="shockHsc" data-step="1"><button>-</button><div class="stepvalue">HSC <span id="shockHsc">4</span></div><button>+</button></div>
         <div class="stepper" data-target="shockLsc" data-step="1"><button>-</button><div class="stepvalue">LSC <span id="shockLsc">5</span></div><button>+</button></div>
-        <div class="stepper" data-target="shockHsr" data-step="1"><button>-</button><div class="stepvalue">HSR <span id="shockHsr">3</span></div><button>+</button></div>
+        <div class="stepper" id="shockHsrEditor" data-target="shockHsr" data-step="1"><button>-</button><div class="stepvalue">HSR <span id="shockHsr">3</span></div><button>+</button></div>
         <div class="stepper" data-target="shockLsr" data-step="1"><button>-</button><div class="stepvalue">LSR <span id="shockLsr">11</span></div><button>+</button></div>
       </div>
     </div>
@@ -634,7 +642,7 @@
   </div>
 </div>
 
-<script src="app.js?v=0.4.1"></script>
+<script src="app.js?v=0.4.2"></script>
 
 </body>
 </html>
