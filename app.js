@@ -338,7 +338,13 @@ function renderOtherBikeSetup(){
 }
 function renderProfileSpecs(){
  const bullit=activeBike==='bullit',c=current(),p=profile();
- for(const id of ['bullitBuildCard','bullitFactoryCard','bullitGeometryCard','bullitFrameFacts','torqueList','bullitComponentDetails']){
+ $('baselineSelector').style.display=bullit?'':'none';
+ $('setupForkDesc').textContent=(c.forkModel||p.fork)+' · '+(c.forkTravel||p.forkTravel)+' mm';
+ $('setupShockDesc').textContent=c.shockModel||p.shock;
+ for(const el of document.querySelectorAll('#setup .assessment, #setup .tiny, #spec-components > details.component-detail')){
+   el.style.display=bullit?'':'none';
+ }
+ for(const id of ['bullitFactoryTitle','bullitFrameTitle','bullitTorqueSearch','bullitBuildCard','bullitFactoryCard','bullitGeometryCard','bullitFrameFacts','torqueList']){
    const el=$(id);if(el)el.style.display=bullit?'':'none';
  }
  for(const id of ['otherBikeBuild','otherBikeGeometry','otherBikeTorque','otherBikeComponents']){
