@@ -447,7 +447,7 @@ function renderProfileSpecs(){
  $('supremeSourceLinks').style.display=supreme?'':'none';
  $('setupForkDesc').textContent=(c.forkModel||p.fork)+' · '+(c.forkTravel||p.forkTravel)+' mm';
  $('setupShockDesc').textContent=c.shockModel||p.shock;
- for(const el of document.querySelectorAll('#setup .assessment, #setup .tiny, #spec-components > details.component-detail')){
+ for(const el of document.querySelectorAll('#setup .assessment, #setup .tiny:not(#supremeSourceLinks), #spec-components > details.component-detail')){
    el.style.display=bullit?'':'none';
  }
  for(const id of ['bullitFactoryTitle','bullitFrameTitle','bullitTorqueSearch','bullitBuildCard','bullitFactoryCard','bullitGeometryCard','bullitFrameFacts','torqueList']){
@@ -469,7 +469,10 @@ function renderProfileSpecs(){
  $('otherBikeBuild').innerHTML='<div class="card"><h3>'+esc(p.name)+'</h3><div class="spec-list">'+rows.map(([name,val])=>'<div class="spec-row"><span>'+esc(name)+'</span><strong>'+esc(val)+'</strong></div>').join('')+'</div><div class="data-note">These are previously recorded settings. Verify any uncertain components before relying on them.</div></div>';
  $('otherBikeGeometry').innerHTML='<div class="card"><h3>'+esc(p.label)+' geometry</h3><div class="spec-row"><span>Current geometry</span><strong>'+esc(c.geometry||'Unrecorded')+'</strong></div><div class="spec-row"><span>Progression</span><strong>'+esc(c.progression||'Unrecorded')+'</strong></div><div class="data-note">Manufacturer geometry reference pending verification.</div></div>';
  $('otherBikeTorque').innerHTML='<div class="card"><h3>Torque specs</h3><div class="data-note">Not yet verified for '+esc(p.label)+'. Bullit-specific torque values are hidden.</div></div>';
- $('otherBikeComponents').innerHTML='<div class="card"><h3>Components</h3><div class="spec-row"><span>Fork</span><strong>'+esc(c.forkModel||p.fork)+'</strong></div><div class="spec-row"><span>Rear shock</span><strong>'+esc(c.shockModel||p.shock)+'</strong></div><div class="data-note">Use Edit current setup on the dashboard to update components, then log work under Service.</div></div>';
+ $('otherBikeComponents').innerHTML='<div class="card"><h3>Components</h3><div class="spec-row"><span>Fork</span><strong>'+esc(c.forkModel||p.fork)+'</strong></div><div class="spec-row"><span>Rear shock</span><strong>'+esc(c.shockModel||p.shock)+'</strong></div><div class="data-note">Use Edit current setup on the dashboard to update components, then log work under Service.</div></div>'; 
+ if(activeBike==='supreme'){
+   $('otherBikeComponents').innerHTML+='<div class="card"><h3>Rider observations</h3><div class="spec-row"><span>FOX 40 bottom-out marker</span><strong>12mm from top (user measured)</strong></div><div class="spec-row"><span>O-Chain (July 23–24)</span><strong>9°</strong></div><div class="spec-row"><span>Chainstay (July 23)</span><strong>+6mm</strong></div><div class="spec-row"><span>Handlebar (July 23)</span><strong>Rolled back 5°</strong></div><div class="data-note">Historical notes only; verify current positions before treating these as installed today.</div></div>';
+ }
 }
 
 function renderTodos(){
@@ -514,6 +517,7 @@ function fillRideForm(r){
   $('geometryText').value=r.geometry||'';
   $('progressionText').value=r.progression||'';
   $('nonBullitFlipFields').style.display=activeBike==='bullit'?'none':'';
+  $('shockAdjusterNote').style.display=activeBike==='supreme'?'':'none';
   $('bullitFlipFields').style.display=activeBike==='bullit'?'':'none';
   updateShockTypeUI();
   $('forkSagMm').value=Number.isFinite(r.forkSagMm)?r.forkSagMm:'';
