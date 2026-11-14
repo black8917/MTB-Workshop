@@ -1,6 +1,6 @@
 'use strict';
 
-const APP_VERSION = '0.4.3';
+const APP_VERSION = '0.4.4';
 const DB_NAME = 'BikeWorkshopPWA';
 const DB_VERSION = 1;
 let db;
@@ -83,23 +83,23 @@ const SUPREME_HISTORICAL_RAW=[
   frontPsi:27,rearPsi:30,frontTire:'Albert Radial Ultra Soft Gravity',rearTire:'Tacky Chan Ultra Soft Gravity Pro',
   notes:'Fork 86 psi, 2 tokens, LSC9 HSC5 LSR9/16 HSR8/9. Vivid Ultimate DH 500 lb spring, 17% sag, preload 1T, 7wt oil noted; LSC0 HSC1 LSR4/19 HBO3. Tires F27/R30.'},
  {date:'2026-07-23',forkPsi:86,spacers:1,hsc:5,lsc:9,hsr:7,lsr:9,
-  springRate:550,shockLsc:2,shockHsc:2,shockLsr:4,hbo:2,
+  springRate:450,shockLsc:2,shockHsc:2,shockLsr:4,hbo:2,
   frontPsi:25,rearPsi:28,frontTire:'Magic Mary Radial Ultra Soft Gravity',rearTire:'Tacky Chan Radial Ultra Soft Gravity Pro',
   ochainDeg:9,chainstayAdjustmentMm:6,barRollBackDeg:5,
-  notes:'New O-Chain 9°, +6mm chainstay, bars rolled back 5°. Fork 86 psi, 1 token, LSC9 HSC5 LSR9/16 HSR7/9. Vivid Ultimate DH 550 lb spring, preload 1T, 7wt oil noted, LSC2 HSC2 LSR4/19 HBO2. Magic Mary F25 and Tacky Chan R28.'},
+  notes:'New O-Chain 9°, +6mm chainstay, bars rolled back 5°. Fork 86 psi, 1 token, LSC9 HSC5 LSR9/16 HSR7/9. Vivid Ultimate DH 450 lb spring, preload 1T, 7wt oil noted, LSC2 HSC2 LSR4/19 HBO2. Magic Mary F25 and Tacky Chan R28.'},
  {date:'2026-07-24',forkPsi:86,spacers:1,hsc:5,lsc:9,hsr:7,lsr:9,
-  springRate:550,shockLsc:2,shockHsc:2,shockLsr:4,hbo:2,ochainDeg:9,
-  notes:'New O-Chain 9°. Fork 86 psi, 1 token, LSC9 HSC5 LSR9/16 HSR7/9. Vivid Ultimate DH 550 lb spring, preload 1T, 7wt oil noted, LSC2 HSC2 LSR4/19 HBO2. Tire pressures not recorded.'},
+  springRate:450,shockLsc:2,shockHsc:2,shockLsr:4,hbo:2,ochainDeg:9,
+  notes:'New O-Chain 9°. Fork 86 psi, 1 token, LSC9 HSC5 LSR9/16 HSR7/9. Vivid Ultimate DH 450 lb spring, preload 1T, 7wt oil noted, LSC2 HSC2 LSR4/19 HBO2. Tire pressures not recorded.'},
  {date:'2026-07-26',forkPsi:86,spacers:1,hsc:5,lsc:9,hsr:7,lsr:9,
-  springRate:550,shockLsc:1,shockHsc:2,shockLsr:3,hbo:1,
-  notes:'Fork 86 psi, 1 token, LSC9 HSC5 LSR9/16 HSR7/9. Vivid Ultimate DH 550 lb spring, preload 1T, 7wt oil noted, LSC1 HSC2 LSR3/19 HBO1.'},
+  springRate:450,shockLsc:1,shockHsc:2,shockLsr:3,hbo:1,
+  notes:'Fork 86 psi, 1 token, LSC9 HSC5 LSR9/16 HSR7/9. Vivid Ultimate DH 450 lb spring, preload 1T, 7wt oil noted, LSC1 HSC2 LSR3/19 HBO1.'},
  {date:'2026-07-30',forkPsi:88,spacers:0,hsc:5,lsc:9,hsr:7,lsr:11,
-  springRate:550,shockLsc:1,shockHsc:2,shockLsr:3,hbo:1,
-  notes:'Fork 88 psi, 0 tokens, LSC9 HSC5 LSR11/16 HSR7/9. Vivid Ultimate DH 550 lb spring, preload 1T, 7wt oil noted, LSC1 HSC2 LSR3/19 HBO1.'},
+  springRate:450,shockLsc:1,shockHsc:2,shockLsr:3,hbo:1,
+  notes:'Fork 88 psi, 0 tokens, LSC9 HSC5 LSR11/16 HSR7/9. Vivid Ultimate DH 450 lb spring, preload 1T, 7wt oil noted, LSC1 HSC2 LSR3/19 HBO1.'},
  {date:'2026-08-16',forkPsi:88,spacers:0,hsc:9,lsc:10,hsr:6,lsr:10,
-  springRate:550,shockLsc:2,shockHsc:2,shockLsr:3,hbo:1,
+  springRate:450,shockLsc:2,shockHsc:2,shockLsr:3,hbo:1,
   frontPsi:24,rearPsi:26,frontTire:'Magic Mary Radial Ultra Soft Gravity',rearTire:'Tacky Chan Ultra Soft Gravity Pro',
-  notes:'Fork 88 psi, 0 tokens, LSC10 HSC9 LSR10/16 HSR6/9. Vivid Ultimate DH 550 lb spring, preload 1T, 7wt oil noted, LSC2 HSC2 LSR3/19 HBO1. Magic Mary F24 psi / Tacky Chan R26 psi.'}
+  notes:'Fork 88 psi, 0 tokens, LSC10 HSC9 LSR10/16 HSR6/9. Vivid Ultimate DH 450 lb spring, preload 1T, 7wt oil noted, LSC2 HSC2 LSR3/19 HBO1. Magic Mary F24 psi / Tacky Chan R26 psi.'}
 ];
 const SUPREME_HISTORICAL_SETUPS=SUPREME_HISTORICAL_RAW.map(r=>({
  ...FIRST_SETUP.supreme,...r,id:'supreme_history_'+r.date,bikeId:'supreme',recordType:'setup',
@@ -211,7 +211,7 @@ async function seedIfNeeded(){
   if(!(await getMeta('supremeSpringCorrectionV043'))){
     const key=setupKey('supreme'),setup=await getMeta(key);
     if(setup?.id==='supreme_current'&&setup.springRate===550){
-      await put('meta',{key,value:{...setup,springRate:450,notes:'Spring correction: original 450 lb/in spring reinstalled; 500 lb/in previously tested. Historical 550 notes unverified. '+(setup.notes||'')}});
+      await put('meta',{key,value:{...setup,springRate:450,notes:'Spring correction: original 450 lb/in spring reinstalled; 500 lb/in previously tested. Historical 550 values corrected to 450 as confirmed by rider. '+(setup.notes||'')}});
     }
     for(const item of await getAll('rides')){
       if(item.bikeId==='supreme'&&item.id?.startsWith('supreme_history_')&&item.springRate===550){
@@ -221,6 +221,32 @@ async function seedIfNeeded(){
       }
     }
     await put('meta',{key:'supremeSpringCorrectionV043',value:true});
+  }
+  // v0.4.4 rider correction: imported July/August 550 values were typos.
+  // Replace only these five known imported setup records. Keep 500 entries,
+  // user-created records and current settings untouched.
+  if(!(await getMeta('supremeSpringCorrectionV044'))){
+    const correctedDates=new Set(['2026-07-23','2026-07-24','2026-07-26','2026-07-30','2026-08-16']);
+    for(const item of await getAll('rides')){
+      if(item.bikeId!=='supreme'||item.recordType!=='setup'||
+         !correctedDates.has(item.date)||item.id!=='supreme_history_'+item.date)continue;
+      // 0.4.3 flags these values as null with original text retained.
+      if(item.springRate===550 || (item.springRate===null && item.historicalSpringRateAsWritten===550)){
+        const note=(item.notes||'')
+          .replaceAll('550 lb spring','450 lb spring')
+          .replaceAll('550 lb/in','450 lb/in')
+          .replace(/\s*\[Correction Nov 2026: 450 lb\/in appears to be a transcription error; rider recalls only 450 and 500 lb\/in\. Actual rate on this date unconfirmed\.\]/g,'')
+          .replace(/\s*\[Correction Nov 2026: 550 lb\/in appears to be a transcription error; rider recalls only 450 and 500 lb\/in\. Actual rate on this date unconfirmed\.\]/g,'');
+        const {historicalSpringRateAsWritten,springRateUnverified,...original}=item;
+        await put('rides',{...original,springRate:450,notes:note});
+      }
+    }
+    // Do not overwrite an explicitly modified current setup.
+    const key=setupKey('supreme'),setup=await getMeta(key);
+    if(setup?.id==='supreme_current'&&setup.springRate===550){
+      await put('meta',{key,value:{...setup,springRate:450}});
+    }
+    await put('meta',{key:'supremeSpringCorrectionV044',value:true});
   }
   await put('meta',{key:'appVersion',value:APP_VERSION});
 }
