@@ -1,6 +1,6 @@
 'use strict';
 
-const APP_VERSION = '0.2.0';
+const APP_VERSION = '0.3.0';
 const DB_NAME = 'BikeWorkshopPWA';
 const DB_VERSION = 1;
 let db;
@@ -11,7 +11,7 @@ let progression = 'LO';
 let geometry = 'LO';
 let setupOverride = null;
 let editingSetup = false;
-let baseline = 'fox';
+let baseline = 'sc';
 let editingRideId = null;
 let simpleMode = null;
 
@@ -191,15 +191,36 @@ function renderRides(){
   document.querySelectorAll('[data-edit-ride]').forEach(b=>b.onclick=()=>openRide(b.dataset.editRide));
 }
 
-// Manufacturer references are deliberately source-specific. Unknown exact Bullit-tune values stay blank.
+// Santa Cruz suspension calculator snapshot: 185 lb rider, 2026 Bullit X01 AXS.
+// The user's X2 came from this build. The fork reference is X01 Factory 38,
+// whereas the installed fork is Performance Elite GRIP X2. Do not interpolate.
+const SC_RIDER_LBS = 185;
 const forkBaseline={
-  sc:{pressure:null,hsc:null,lsc:null,hsr:null,lsr:null,label:'Santa Cruz'},
-  fox:{pressure:93,hsc:5,lsc:10,hsr:5,lsr:7,label:'FOX FLOAT'}
+  sc:{pressure:104,hsc:4,lsc:5,hsr:6,lsr:7,label:'Santa Cruz Bullit X01 · 185 lb'},
+  fox:{pressure:93,hsc:5,lsc:10,hsr:5,lsr:7,label:'FOX 38 generic'}
 };
 const shockBaseline={
-  sc:{pressure:null,sag:null},
-  fox:{pressure:null,sag:null}
+  sc:{pressure:215,hsc:3,lsc:6,hsr:3,lsr:11,sagMin:28,sagMax:30},
+  fox:{pressure:null}
 };
+// FOX 2026 FLOAT X2: click-out recommendations by shock air pressure (psi).
+// Fields with two values are the range of recommended clicks.
+const FOX_X2_BANDS=[
+ {min:0,max:100,lsr:13,hsr:7,lsc:[11,13],hsc:[6,7]},
+ {min:100,max:120,lsr:12,hsr:7,lsc:[11,13],hsc:[6,7]},
+ {min:120,max:140,lsr:11,hsr:6,lsc:[11,13],hsc:[6,7]},
+ {min:140,max:160,lsr:10,hsr:6,lsc:[9,10],hsc:[4,5]},
+ {min:160,max:180,lsr:9,hsr:5,lsc:[9,10],hsc:[4,5]},
+ {min:180,max:200,lsr:8,hsr:4,lsc:[9,10],hsc:[4,5]},
+ {min:200,max:220,lsr:7,hsr:4,lsc:[9,10],hsc:[4,5]},
+ {min:220,max:240,lsr:6,hsr:3,lsc:[9,10],hsc:[4,5]},
+ {min:240,max:260,lsr:5,hsr:2,lsc:[7,8],hsc:[2,3]},
+ {min:260,max:280,lsr:4,hsr:2,lsc:[7,8],hsc:[2,3]},
+ {min:280,max:301,lsr:3,hsr:1,lsc:[7,8],hsc:[2,3]}
+];
+function foxX2Baseline(psi){
+ return FOX_X2_BANDS.find(r=>psi>=r.min&&psi<r.max)||null;
+}
 function deltaText(y,b){if(b===null||b===undefined)return '—';const d=Number(y)-Number(b);return d===0?'0':`${d>0?'+':''}${d}`;}
 function pos(v,max){return Math.max(3,Math.min(97,(Number(v)/max)*100));}
 function comparisonRow(label,y,b,max,note,unit='',maxLabel=''){
@@ -208,28 +229,50 @@ function comparisonRow(label,y,b,max,note,unit='',maxLabel=''){
   const cls=!has?'neutral':Math.abs(d)<=1?'good':'warn';
   const yDisplay=unit==='psi'?`${y} psi`:`${y}${maxLabel}`;
   const bDisplay=!has?'—':unit==='psi'?`${b} psi`:`${b}${maxLabel}`;
-  const minePos=unit==='psi'?pos(y,140):pos(y,max);
-  const basePos=has?(unit==='psi'?pos(b,140):pos(b,max)):50;
+  const minePos=pos(y,max);
+  const basePos=has?pos(b,max):50;
   return `<div class="compare-row"><div class="compare-top"><div class="setting">${esc(label)}</div><div class="your">${esc(yDisplay)}</div><div class="base">${esc(bDisplay)}</div><div class="delta ${cls}">${esc(deltaText(y,b))}</div></div><div class="barwrap"><div class="barfill" style="width:${minePos}%"></div>${has?`<div class="baseline" style="left:${basePos}%"></div>`:''}<div class="mine-dot" style="left:${minePos}%"></div></div><div class="row-note">${esc(note)}</div></div>`;
+}
+function comparisonRangeRow(label,y,range,max,note,maxLabel=''){
+  if(!range)return comparisonRow(label,y,null,max,note,'',maxLabel);
+  const [lo,hi]=range;
+  const delta=y<lo?y-lo:y>hi?y-hi:0;
+  const color=delta===0?'good':Math.abs(delta)<=1?'good':'warn';
+  const mid=(lo+hi)/2;
+  return '<div class="compare-row"><div class="compare-top"><div class="setting">'+esc(label)+'</div><div class="your">'+esc(y+maxLabel)+'</div><div class="base">'+esc(lo+'–'+hi+maxLabel)+'</div><div class="delta '+color+'">'+esc(delta===0?'0':(delta>0?'+':'')+delta)+'</div></div><div class="barwrap"><div class="barfill" style="width:'+pos(y,max)+'%"></div><div class="baseline" style="left:'+pos(mid,max)+'%"></div><div class="mine-dot" style="left:'+pos(y,max)+'%"></div></div><div class="row-note">'+esc(note)+'</div></div>';
 }
 function renderSetup(){
   const c=current(),f=forkBaseline[baseline],s=shockBaseline[baseline];
+  const sc=baseline==='sc',fox=sc?null:foxX2Baseline(Number(c.shockPsi));
+  const clicks='All click counts OUT from fully clockwise closed. Positive compression Δ = softer; positive rebound Δ = faster.';
+  $('suspensionReference').textContent=sc
+    ?'Santa Cruz calculator · 185 lb · 2026 Bullit X01 AXS. Shock reference matches the X01 FLOAT X2 fitted to this bike; fork reference is the X01 Factory 38, not the installed Performance Elite.'
+    :'FOX 2026 component manuals · generic setup. FLOAT X2 damping dynamically follows the current shock PSI; not a Bullit-specific recommendation.';
   $('forkRows').innerHTML=
-    `<div class="compare-row"><div class="compare-top"><div class="setting">Sag</div><div class="your">${Number.isFinite(c.forkSagMm)?esc(c.forkSagMm+' mm / '+(c.forkSagMm/170*100).toFixed(1)+'%'):'Not measured'}</div><div class="base">—</div><div class="delta neutral">—</div></div><div class="row-note">Measured mm; percent calculated from 170 mm fork travel.</div></div>`+
-    comparisonRow('Air pressure',c.forkPsi,f.pressure,140,baseline==='fox'?'FOX 2026 38 FLOAT starting point shown for 170–180 lb. FOX also lists a separate E-Bike+ pressure; confirm exact fork chassis before treating this as your final pressure baseline.':'Santa Cruz does not publish a pressure target in the bike page currently stored in the app. Use sag and verified bike-specific setup data.','psi')+
-    comparisonRow('HSC',c.hsc,f.hsc,11,baseline==='fox'?'FOX GRIP X2 generic start: 5 clicks OUT from closed.':'No Santa Cruz HSC value stored yet.','','/11')+
-    comparisonRow('LSC',c.lsc,f.lsc,18,baseline==='fox'?'FOX GRIP X2 generic start: 10 clicks OUT from closed.':'No Santa Cruz LSC value stored yet.','','/18')+
-    comparisonRow('HSR',c.hsr,f.hsr,8,baseline==='fox'?'FOX rebound table varies with rider weight/pressure; this reference is for the 170–180 lb row.':'No Santa Cruz HSR value stored yet.','','/8')+
-    comparisonRow('LSR',c.lsr,f.lsr,15,baseline==='fox'?'FOX rebound table varies with rider weight/pressure; this reference is for the 170–180 lb row.':'No Santa Cruz LSR value stored yet.','','/15');
+    '<div class="compare-row"><div class="compare-top"><div class="setting">Sag</div><div class="your">'+(Number.isFinite(c.forkSagMm)?esc(c.forkSagMm+' mm / '+(c.forkSagMm/170*100).toFixed(1)+'%'):'Not measured')+'</div><div class="base">—</div><div class="delta neutral">—</div></div><div class="row-note">Measured mm as a percent of 170 mm fork travel.</div></div>'+
+    comparisonRow('Air pressure',c.forkPsi,f.pressure,140,sc?'185 lb X01 Factory 38 pressure reference.':'FOX generic 38 pressure starting point.','psi')+
+    comparisonRow('HSC',c.hsc,f.hsc,11,clicks,'','/11')+
+    comparisonRow('LSC',c.lsc,f.lsc,18,clicks,'','/18')+
+    comparisonRow('HSR',c.hsr,f.hsr,8,clicks,'','/8')+
+    comparisonRow('LSR',c.lsr,f.lsr,15,clicks,'','/15');
+  const pct=Number.isFinite(c.shockSagMm)?c.shockSagMm/65*100:null;
+  const sagDelta=sc&&pct!==null?(pct<s.sagMin?(pct-s.sagMin).toFixed(1)+'%':pct>s.sagMax?'+'+(pct-s.sagMax).toFixed(1)+'%':'0'):'—';
+  const sagCurrent=pct===null?'Recheck':c.shockSagMm+' mm / '+pct.toFixed(1)+'%';
+  const sagBaseline=sc?s.sagMin+'–'+s.sagMax+'%':'—';
+  const sagRow='<div class="compare-row"><div class="compare-top"><div class="setting">Sag</div><div class="your">'+esc(sagCurrent)+'</div><div class="base">'+esc(sagBaseline)+'</div><div class="delta neutral">'+esc(sagDelta)+'</div></div><div class="row-note">65 mm shock stroke. Previous 19 mm reading predates the 205 psi and LOW progression configuration.</div></div>';
+  const foxRange=fox?'FOX 2026 FLOAT X2 at '+c.shockPsi+' psi (pressure band '+fox.min+'–'+(fox.max===301?300:fox.max)+'). ':'FOX X2 manual table is available for 0–300 psi. ';
   $('shockRows').innerHTML=
-    comparisonRow('Air pressure',c.shockPsi,s.pressure,300,baseline==='fox'?'No generic pressure target is applied here; the exact Float X2 tune should be set by sag/bike-specific guidance.':'No Santa Cruz pressure baseline stored yet.','psi')+
-    `<div class="compare-row"><div class="compare-top"><div class="setting">Sag</div><div class="your">${Number.isFinite(c.shockSagMm)?esc(c.shockSagMm+' mm / '+(c.shockSagMm/65*100).toFixed(1)+'%'):'Recheck'}</div><div class="base">—</div><div class="delta neutral">—</div></div><div class="row-note">19 mm was measured before the 205 psi / LOW progression setup. Stroke is 65 mm.</div></div>`+
-    `<div class="compare-row"><div class="compare-top"><div class="setting">Geometry</div><div class="your">${esc(c.geometry||'—')}</div><div class="base">—</div><div class="delta neutral">—</div></div><div class="row-note">Chainstay flip chips.</div></div>`+
-    `<div class="compare-row"><div class="compare-top"><div class="setting">Progression</div><div class="your">${esc(c.progression)}</div><div class="base">—</div><div class="delta neutral">—</div></div><div class="row-note">Stored with every ride so HI/LO changes remain visible in history.</div></div>`+
-    `<div class="compare-row"><div class="compare-top"><div class="setting">HSC / LSC</div><div class="your">${esc(c.shockHsc ?? '—')} / ${esc(c.shockLsc ?? '—')}</div><div class="base">—</div><div class="delta neutral">—</div></div><div class="row-note">Exact manufacturer baseline for the Bullit-specific X2 tune is intentionally not guessed.</div></div>`+
-    `<div class="compare-row"><div class="compare-top"><div class="setting">HSR / LSR</div><div class="your">${esc(c.shockHsr ?? '—')} / ${esc(c.shockLsr ?? '—')}</div><div class="base">—</div><div class="delta neutral">—</div></div><div class="row-note">Clicks OUT from fully closed.</div></div>`;
+    comparisonRow('Air pressure',c.shockPsi,s.pressure,350,sc?'Santa Cruz X01 185 lb pressure starting point; confirm with measured sag.':'FOX suggests body weight in pounds as initial pressure, then adjust to proper sag.','psi')+
+    sagRow+
+    '<div class="compare-row"><div class="compare-top"><div class="setting">Geometry</div><div class="your">'+esc(c.geometry||'—')+'</div><div class="base">—</div><div class="delta neutral">—</div></div><div class="row-note">Chainstay flip chips.</div></div>'+
+    '<div class="compare-row"><div class="compare-top"><div class="setting">Progression</div><div class="your">'+esc(c.progression||'—')+'</div><div class="base">—</div><div class="delta neutral">—</div></div><div class="row-note">Shock progression flip chip.</div></div>'+
+    (sc?comparisonRow('HSC',c.shockHsc,s.hsc,9,clicks,'','/9')
+        :comparisonRangeRow('HSC',c.shockHsc,fox?.hsc||null,9,foxRange+clicks,'/9'))+
+    (sc?comparisonRow('LSC',c.shockLsc,s.lsc,19,clicks,'','/19')
+        :comparisonRangeRow('LSC',c.shockLsc,fox?.lsc||null,19,foxRange+clicks,'/19'))+
+    comparisonRow('HSR',c.shockHsr,sc?s.hsr:(fox?.hsr??null),7,(sc?'Santa Cruz X01. ':foxRange)+clicks,'','/7')+
+    comparisonRow('LSR',c.shockLsr,sc?s.lsr:(fox?.lsr??null),16,(sc?'Santa Cruz X01. ':foxRange)+clicks,'','/16');
 }
-
 function renderTodos(){
   const sorted=[...todos].sort((a,b)=>Number(a.done)-Number(b.done)||String(b.createdAt||'').localeCompare(String(a.createdAt||'')));
   const open=sorted.filter(t=>!t.done).length;
