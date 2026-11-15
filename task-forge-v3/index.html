@@ -215,6 +215,8 @@ body{background:#09111a}
 
 </style>
   <title>Task Forge v3 — Prototype</title>
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="../task-forge/assets/icon-192.png" />
 </head>
 <body>
   <div class="app-shell">
@@ -471,5 +473,6 @@ render();
 
 
 </script>
+  <script>if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}))}</script>
 </body>
 </html>
