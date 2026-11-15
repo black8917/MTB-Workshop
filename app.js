@@ -1,6 +1,6 @@
 'use strict';
 
-const APP_VERSION = '0.4.4';
+const APP_VERSION = '0.4.5';
 const DB_NAME = 'BikeWorkshopPWA';
 const DB_VERSION = 1;
 let db;
