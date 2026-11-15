@@ -19,8 +19,8 @@
     --text:#f7f7f8;
     --muted:#9ca0a7;
     --faint:#656a72;
-    --accent:#ff4a3d;
-    --accent2:#ff756b;
+    --accent:#287fe6;
+    --accent2:#7cbcff;
     --good:#39c776;
     --warn:#ffb340;
     --blue:#3aa4ff;
@@ -37,7 +37,7 @@
   header{position:sticky;top:0;z-index:50;background:linear-gradient(180deg,#08090a 78%,rgba(8,9,10,.92));padding:8px 16px 10px;border-bottom:1px solid rgba(255,255,255,.035)}
   .topline{display:flex;align-items:center;justify-content:space-between;gap:12px}
   .brand{display:flex;align-items:center;gap:10px;min-width:0}
-  .bike-dot{width:38px;height:38px;border-radius:12px;background:linear-gradient(145deg,#4d1010,#e33a30);box-shadow:inset 0 0 0 1px rgba(255,255,255,.12);display:grid;place-items:center;font-weight:900}
+  .bike-dot{width:38px;height:38px;border-radius:12px;background:linear-gradient(145deg,#10345b,#287fe6);box-shadow:inset 0 0 0 1px rgba(255,255,255,.12);display:grid;place-items:center;font-weight:900}
   .titlewrap{min-width:0}
   .eyebrow{font-size:11px;color:var(--muted);font-weight:700;letter-spacing:.08em;text-transform:uppercase}
   .title{font-size:20px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -45,14 +45,14 @@
   .bike-tabs{display:flex;gap:8px;margin-top:12px;overflow:auto;scrollbar-width:none}
   .bike-tabs::-webkit-scrollbar{display:none}
   .bike-tab{flex:0 0 auto;border:1px solid var(--line);background:#111316;color:var(--muted);padding:8px 12px;border-radius:999px;font-size:13px;font-weight:750}
-  .bike-tab.active{background:rgba(255,74,61,.14);border-color:rgba(255,74,61,.5);color:#fff}
+  .bike-tab.active{background:rgba(40,127,230,.14);border-color:rgba(40,127,230,.5);color:#fff}
   .bike-tab.disabled{opacity:.45}
   main{padding:16px}
   .screen{display:none;animation:fade .16s ease}
   .screen.active{display:block}
   @keyframes fade{from{opacity:.7;transform:translateY(3px)}to{opacity:1;transform:none}}
-  .hero{background:linear-gradient(150deg,#241719,#15171a 58%,#121417);border:1px solid rgba(255,74,61,.18);border-radius:24px;padding:18px;box-shadow:var(--shadow);position:relative;overflow:hidden}
-  .hero:after{content:"";position:absolute;right:-70px;top:-80px;width:180px;height:180px;border-radius:50%;background:radial-gradient(circle,rgba(255,74,61,.24),rgba(255,74,61,0) 66%)}
+  .hero{background:linear-gradient(150deg,#14243a,#15191f 58%,#121417);border:1px solid rgba(40,127,230,.18);border-radius:24px;padding:18px;box-shadow:var(--shadow);position:relative;overflow:hidden}
+  .hero:after{content:"";position:absolute;right:-70px;top:-80px;width:180px;height:180px;border-radius:50%;background:radial-gradient(circle,rgba(40,127,230,.24),rgba(40,127,230,0) 66%)}
   .hero .small{font-size:12px;color:#c4c5c8;font-weight:700}
   .hero h1{font-size:28px;margin:4px 0 4px;letter-spacing:-.03em}
   .hero p{font-size:13px;color:var(--muted);margin:0}
@@ -92,7 +92,7 @@
   .mini-line strong{color:var(--text);font-size:12px}
   .status-pill{display:inline-flex;align-items:center;gap:6px;padding:6px 9px;border-radius:999px;background:rgba(57,199,118,.12);color:#79e5a5;font-weight:750;font-size:11px}
   .status-dot{width:7px;height:7px;background:var(--good);border-radius:50%}
-  .primary{width:100%;border:0;border-radius:15px;background:var(--accent);color:white;font-weight:850;padding:15px 16px;font-size:16px;box-shadow:0 8px 22px rgba(255,74,61,.25)}
+  .primary{width:100%;border:0;border-radius:15px;background:var(--accent);color:white;font-weight:850;padding:15px 16px;font-size:16px;box-shadow:0 8px 22px rgba(40,127,230,.25)}
   .secondary{width:100%;border:1px solid var(--line);border-radius:15px;background:var(--panel);color:white;font-weight:800;padding:13px 16px;font-size:14px}
   .action-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
   .ride-card{background:var(--panel);border:1px solid rgba(255,255,255,.05);border-radius:16px;padding:14px;margin-bottom:10px}
@@ -123,12 +123,12 @@
   .compare-labels{display:grid;grid-template-columns:minmax(70px,1fr) 64px 64px 48px;gap:6px;color:var(--faint);font-size:9px;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px}
   .compare-labels span:not(:first-child){text-align:right}
   .barwrap{margin-top:9px;position:relative;height:12px;background:#0e1012;border-radius:999px;border:1px solid #2b2f34;overflow:visible}
-  .barfill{position:absolute;left:0;top:0;bottom:0;border-radius:999px;background:linear-gradient(90deg,#ff453a,#ff776f)}
+  .barfill{position:absolute;left:0;top:0;bottom:0;border-radius:999px;background:linear-gradient(90deg,#287fe6,#7cbcff)}
   .baseline{position:absolute;top:-4px;bottom:-4px;width:2px;background:#f3f3f3;border-radius:2px;opacity:.92}
-  .mine-dot{position:absolute;top:50%;width:10px;height:10px;margin-left:-5px;margin-top:-5px;border-radius:50%;background:#fff;box-shadow:0 0 0 3px rgba(255,74,61,.3)}
+  .mine-dot{position:absolute;top:50%;width:10px;height:10px;margin-left:-5px;margin-top:-5px;border-radius:50%;background:#fff;box-shadow:0 0 0 3px rgba(40,127,230,.3)}
   .row-note{font-size:11px;color:var(--muted);line-height:1.35;margin-top:8px}
   .assessment{background:linear-gradient(180deg,#17191c,#141619);border-left:3px solid var(--accent);border-radius:14px;padding:13px 14px;margin:12px 15px 15px}
-  .assessment h4{margin:0 0 9px;font-size:13px;color:#ff8b84}
+  .assessment h4{margin:0 0 9px;font-size:13px;color:#96caff}
   .assessment p{margin:6px 0;color:#cfd1d5;font-size:11px;line-height:1.45}
   .assessment b{color:white}
   .todo{display:flex;align-items:flex-start;gap:10px;padding:11px 0;border-bottom:1px solid var(--line)}
@@ -142,7 +142,7 @@
   nav button{border:0;background:none;color:#888d95;display:flex;flex-direction:column;align-items:center;gap:4px;font-size:10px;font-weight:700;padding:5px 0}
   nav .ico{font-size:21px;line-height:1}
   nav button.active{color:var(--accent2)}
-  .fab{position:fixed;right:max(18px,calc((100vw - 460px)/2 + 18px));bottom:92px;width:56px;height:56px;border-radius:50%;border:0;background:var(--accent);color:white;font-size:30px;box-shadow:0 10px 28px rgba(255,74,61,.36);z-index:60;display:grid;place-items:center}
+  .fab{position:fixed;right:max(18px,calc((100vw - 460px)/2 + 18px));bottom:92px;width:56px;height:56px;border-radius:50%;border:0;background:var(--accent);color:white;font-size:30px;box-shadow:0 10px 28px rgba(40,127,230,.36);z-index:60;display:grid;place-items:center}
   .modal-back{display:none;position:fixed;inset:0;z-index:100;background:rgba(0,0,0,.62);backdrop-filter:blur(6px);align-items:flex-end;justify-content:center}
   .modal-back.open{display:flex}
   .sheet{width:min(460px,100%);max-height:90vh;overflow:auto;background:#111317;border-radius:24px 24px 0 0;border-top:1px solid #343840;padding:12px 16px calc(20px + env(safe-area-inset-bottom));box-shadow:0 -18px 50px rgba(0,0,0,.5)}
@@ -336,7 +336,7 @@
         <div class="mini-list">
           <div class="mini-line"><span>Storage</span><strong>Local on this iPhone</strong></div>
           <div class="mini-line"><span>Offline</span><strong>Yes after first load</strong></div>
-          <div class="mini-line"><span>Version</span><strong>0.4.4 PWA</strong></div>
+          <div class="mini-line"><span>Version</span><strong>0.4.5 PWA</strong></div>
         </div>
         <div class="action-grid" style="margin-top:14px">
           <button class="secondary" id="exportBtn">Export backup</button>
@@ -642,7 +642,7 @@
   </div>
 </div>
 
-<script src="app.js?v=0.4.4"></script>
+<script src="app.js?v=0.4.5"></script>
 
 </body>
 </html>
