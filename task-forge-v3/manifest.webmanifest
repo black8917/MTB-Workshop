@@ -1,0 +1,23 @@
+{
+  "name": "Task Forge v3 — Prototype",
+  "short_name": "Task Forge",
+  "description": "Private project and habit tracking prototype",
+  "start_url": "./index.html",
+  "scope": "./",
+  "id": "./index.html",
+  "display": "standalone",
+  "background_color": "#09111a",
+  "theme_color": "#0b1622",
+  "icons": [
+    {
+      "src": "../task-forge/assets/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "../task-forge/assets/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
