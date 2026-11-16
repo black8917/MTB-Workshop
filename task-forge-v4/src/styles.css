@@ -221,3 +221,13 @@ body{background:#09111a}
 .habit-buttons{display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end}
 .habit-buttons .btn{padding:8px 10px}
 @media(max-width:650px){.bulk-triage{grid-template-columns:1fr}.bulk-triage .btn{width:100%}.habit-bottom{align-items:flex-start;flex-direction:column}.habit-buttons{justify-content:stretch;width:100%}.habit-buttons .btn{flex:1}.review-task{gap:7px}}
+/* v4.1: category markers follow each user's selected color. */
+.category-tinted{--category-color:#8eafb4}
+.task-row.category-tinted{border-left:3px solid var(--category-color);padding-left:calc(18px - 3px)}
+.task-row.category-tinted .category-chip{border-color:color-mix(in srgb,var(--category-color) 44%,#304756);background:color-mix(in srgb,var(--category-color) 10%,#182a39)}
+.chip-dot{display:inline-block;vertical-align:middle;width:6px;height:6px;border-radius:50%;background:var(--category-color);margin-right:6px}
+.progress-project.category-tinted{border-left:3px solid var(--category-color)}
+.progress-project.category-tinted .progress-track>div{background:var(--category-color)}
+.progress-project.category-tinted .progress-project-top b{color:color-mix(in srgb,var(--category-color) 45%,#edf7fa)}
+.category-heading-dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:9px;vertical-align:middle}
+@media(max-width:650px){.task-row.category-tinted{padding-left:calc(13px - 3px)}}
