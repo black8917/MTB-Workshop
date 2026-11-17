@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+<meta name="theme-color" content="#0b111d" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Task Forge" />
+<meta name="description" content="Offline-first task, project and routine dashboard" />
+<link rel="manifest" href="manifest.webmanifest" />
+<link rel="apple-touch-icon" href="icons/icon-180.png" />
+<link rel="icon" href="icons/icon-192.png" />
+<link rel="stylesheet" href="styles.css?v=5.2" />
+<title>Task Forge v5</title>
+</head>
+<body>
+<div id="app">
+  <header class="app-header">
+    <div class="brand" id="brand-home"><span class="logo">TF<span class="logo-notch">/</span></span><span><b>TASK FORGE</b><small>PERSONAL COMMAND CENTER</small></span></div>
+    <div class="header-actions"><span id="header-clock" class="header-clock"></span><button id="new-task-btn" class="btn btn-accent btn-new" type="button"><span class="plus">+</span> New task</button></div>
+  </header>
+  <main id="main" aria-live="polite"></main>
+  <nav id="bottom-nav" class="bottom-nav" aria-label="Main navigation">
+    <button data-route="home" class="active"><span class="ni">⌂</span><small>Home</small></button>
+    <button data-route="tasks"><span class="ni">☷</span><small>Tasks</small></button>
+    <button data-route="review"><span class="ni">▣</span><small>Review</small><span id="review-count-bubble" class="navbubble" hidden></span></button>
+    <button data-route="projects"><span class="ni">▦</span><small>Projects</small></button>
+    <button data-route="routines"><span class="ni">◷</span><small>Routines</small></button>
+    <button data-route="email"><span class="ni">✉</span><small>Email</small></button>
+    <button data-route="settings"><span class="ni">⚙</span><small>Settings</small></button>
+  </nav>
+</div>
+<div id="modal-root"></div><div id="toast-root"></div><input type="file" id="file-input" accept=".json,application/json" hidden />
+<script src="app.js?v=5.2" defer></script>
+</body>
+</html>
