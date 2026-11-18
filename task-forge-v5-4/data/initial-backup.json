@@ -1,0 +1,61 @@
+{
+  "schemaVersion": 5,
+  "source": "Task Forge v5 starter (no personal data)",
+  "preferences": {},
+  "categories": [
+    {
+      "name": "To Do",
+      "icon": "grid",
+      "color": "#ff695f",
+      "visible": true
+    },
+    {
+      "name": "Home",
+      "icon": "grid",
+      "color": "#ffac56",
+      "visible": true
+    },
+    {
+      "name": "Vehicles",
+      "icon": "grid",
+      "color": "#61c5ff",
+      "visible": true
+    },
+    {
+      "name": "Mountain Bikes",
+      "icon": "grid",
+      "color": "#47e7ad",
+      "visible": true
+    },
+    {
+      "name": "Fitness",
+      "icon": "grid",
+      "color": "#ff83a6",
+      "visible": true
+    },
+    {
+      "name": "Finances",
+      "icon": "grid",
+      "color": "#ffd36b",
+      "visible": true
+    },
+    {
+      "name": "Email",
+      "icon": "grid",
+      "color": "#a89bff",
+      "visible": true
+    },
+    {
+      "name": "Inbox",
+      "icon": "grid",
+      "color": "#74cedf",
+      "visible": true
+    }
+  ],
+  "projects": [],
+  "tasks": [],
+  "habits": [],
+  "history": {},
+  "emailProposals": [],
+  "suggestions": []
+}
