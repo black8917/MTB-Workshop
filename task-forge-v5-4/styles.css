@@ -49,3 +49,44 @@ html{scroll-padding-top:calc(90px + var(--safeTop))}
 .order-actions{margin-top:13px}
 .order-actions .btn{white-space:normal;text-align:center}
 @media(max-width:500px){.page-header{gap:9px}.email-history-row{grid-template-columns:68px minmax(0,1fr);gap:8px}.email-history-row .tag{font-size:9px}.order-top{flex-direction:column;gap:7px}.order-state{align-self:flex-start}.order-actions .btn{flex:1 1 auto}}
+
+/* Today's Focus: compact overview, explicit daily choices, touch-size controls. */
+.focus-card{border-top:3px solid var(--cyan);background:linear-gradient(135deg,#122d3e,#11232e)}
+.focus-card .card-head{flex-wrap:wrap;gap:12px;margin-bottom:12px}
+.focus-card h1{font-size:clamp(24px,5vw,32px);margin:5px 0 0;line-height:1.2}
+.focus-card .eyebrow{font-size:14px;letter-spacing:.08em}
+.focus-card .btn,.focus-pick-row .btn,.task-today{font-size:14px;min-height:44px}
+.focus-progress{display:flex;flex-wrap:wrap;align-items:center;gap:14px;font-size:14px;color:var(--muted);padding-bottom:12px}
+.focus-progress progress{appearance:none;height:7px;flex:1;min-width:90px;max-width:240px;border:0;border-radius:8px;overflow:hidden;background:var(--line);accent-color:var(--cyan)}
+.focus-progress progress::-webkit-progress-bar{background:var(--line)}
+.focus-progress progress::-webkit-progress-value{background:var(--cyan)}
+.focus-progress progress::-moz-progress-bar{background:var(--cyan)}
+.focus-row{display:flex;align-items:center;gap:10px;padding:12px 0;border-top:1px solid var(--line)}
+.focus-row .checkbox{width:44px;height:44px;flex:none}
+.focus-task{flex:1;min-width:0;overflow-wrap:anywhere}
+.focus-title{display:block;border:0;background:none;padding:0;text-align:left;color:var(--text);font-weight:750;font-size:16px;line-height:1.4;min-height:44px;cursor:pointer}
+.focus-meta{font-size:14px;line-height:1.45;color:var(--muted);margin-top:4px;overflow-wrap:anywhere}
+.focus-controls{display:flex;gap:4px;flex:none}
+.focus-icon{min-width:44px;width:44px;padding:0;font-size:20px!important}
+.focus-empty{font-size:16px;line-height:1.6;color:var(--muted);margin:12px 0}
+.focus-success{color:var(--green);font-size:16px}
+.focus-completed summary{font-size:14px;color:var(--green);padding:14px 0;cursor:pointer}
+.focus-done-title{text-decoration:line-through;color:var(--muted)}
+.focus-carry{display:flex;align-items:center;justify-content:space-between;gap:12px;border-top:1px solid var(--line);padding-top:12px;margin-top:8px;font-size:14px;color:var(--orange)}
+.home-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:14px;overflow:hidden;margin-bottom:16px}
+.home-stats button{display:flex;align-items:center;justify-content:center;gap:8px;background:var(--surface);color:var(--text);border:0;padding:12px 6px;cursor:pointer;min-height:56px}
+.home-stats b{font-size:20px}.home-stats span{font-size:14px;color:var(--muted)}
+.task-row:has(.task-today){grid-template-columns:26px minmax(0,1fr) auto auto}
+.task-today{padding:6px 9px;white-space:nowrap}.task-today.is-today{color:var(--cyan);border-color:var(--cyan)}
+.focus-search{width:100%;min-height:46px;background:#0b1b2b;color:var(--text);border:1px solid #365064;padding:10px 12px;border-radius:10px;font-size:16px;margin:10px 0}
+.focus-pick-row{display:flex;gap:12px;align-items:center;padding:14px 0;border-bottom:1px solid var(--line)}
+.focus-pick-row strong{font-size:16px;line-height:1.4}.focus-pick-actions{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;max-width:180px}
+#focus-picker-results h3{font-size:16px;margin:16px 0 6px}
+.focus-form-choice{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:16px;padding:12px 0}
+.focus-form-choice input{width:24px;height:24px;accent-color:var(--cyan)}
+.focus-form-choice span{font-size:14px;color:var(--muted)}
+.focus-card button:focus-visible,.focus-search:focus-visible,.task-today:focus-visible,.home-stats button:focus-visible{outline:2px solid var(--cyan);outline-offset:3px}
+@media(max-width:600px){.home-stats button{flex-direction:column;gap:2px}.focus-row{flex-wrap:wrap}.focus-controls{width:100%;justify-content:flex-end;margin-top:-4px}.focus-pick-actions{max-width:112px}.task-row:has(.task-today){grid-template-columns:26px minmax(0,1fr) auto}.task-row:has(.task-today) .task-content{grid-column:2/4}.task-today{grid-column:2;justify-self:start}.task-row:has(.task-today) .task-more{grid-column:3}.focus-card .card-head>.btn{padding:8px 12px}}
+
+.focus-edit{order:3;margin-left:auto;min-height:44px;font-size:14px;color:var(--cyan);border:0;background:transparent;padding:4px 0 4px 8px}
+.focus-title{min-height:0}.focus-row{min-height:78px}.focus-progress progress{min-width:60px}.focus-progress{gap:10px}
