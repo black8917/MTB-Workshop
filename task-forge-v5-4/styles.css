@@ -90,3 +90,6 @@ html{scroll-padding-top:calc(90px + var(--safeTop))}
 
 .focus-edit{order:3;margin-left:auto;min-height:44px;font-size:14px;color:var(--cyan);border:0;background:transparent;padding:4px 0 4px 8px}
 .focus-title{min-height:0}.focus-row{min-height:78px}.focus-progress progress{min-width:60px}.focus-progress{gap:10px}
+
+/* Optional task checklist */
+.checklist-editor{margin:16px 0}.checklist-editor-row{display:flex;align-items:center;gap:10px;margin-top:10px}.checklist-editor-row .checklist-done{width:24px;height:24px;flex:0 0 24px;accent-color:var(--accent)}.checklist-editor-row .checklist-text{min-width:0;flex:1;font-size:16px}.checklist-editor-row .btn{min-width:44px;min-height:44px}.checklist-done:checked+.checklist-text{text-decoration:line-through;color:var(--muted)}.checklist-progress{font-size:13px;white-space:nowrap}

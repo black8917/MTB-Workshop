@@ -20,3 +20,8 @@ Gmail triage, Orders & Deliveries, routines, projects, categories, Trash, backup
 
 ## Data and privacy
 The public deployment ships an empty starter backup only. Personal task/email/order data and daily choices remain in the browser’s existing localStorage. No personal backup or OAuth access token is included in source. The service-worker asset cache is versioned 5.4.1; the data storage key is unchanged.
+
+## v5.4.2 — Optional task checklists
+- Open or create a task and choose Add checklist. Add, rename, remove, and check off items, then save. Enter adds the next item. Cancel discards checklist edits.
+- Task cards and Today's Focus show completed/total item counts. Completing all items does not automatically complete the parent task.
+- Notes remain available for details. Existing storage keys and app URL are unchanged; checklists travel with backup/restore and Trash recovery.
