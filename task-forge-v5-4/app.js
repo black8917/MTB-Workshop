@@ -1,20 +1,16 @@
 'use strict';
-const STORE='task-forge-v5.4-state';
+const TF=globalThis.TF;
+if(!TF) throw Error('Task Forge data core failed to load.');
+const STORE=TF.STORE_KEY;
 const GMAIL_SESSION='task-forge-v5.4-gmail-session';
 const LEGACY_KEYS=['task-forge-v4','task-forge-v4-state','taskForgeState','task-forge-state','taskforge-data'];
-const VIVID={Home:'#ffac56',Vehicles:'#61c5ff','Mountain Bikes':'#47e7ad','Outdoor & Snow':'#bc9aff',Fitness:'#ff83a6',Finances:'#ffd36b',Work:'#67aaff',Email:'#a89bff',Inbox:'#74cedf',Entertainment:'#dd87ff','Stuff To Sell':'#9de66b','To Do':'#ff695f',Health:'#5bd2ed'};
+const APP_VERSION='5.5';
+const {uid,iso,parseDate,addDays,cleanColor,isMutedColor,esc,normalize,normalizeFocus,normalizeChecklist,FOCUS_LIMIT,VIVID}=TF;
 const PRESETS=['#27d2f3','#ff9f58','#4adfa8','#f56f94','#b29aff','#ff6a63','#ffcf61','#64b7ff','#d581ff','#9de66b'];
 const DOW=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 const LONGDOW=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
 const $=s=>document.querySelector(s);
-const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const isMutedColor=hex=>{if(!/^#[0-9a-fA-F]{6}$/.test(hex||''))return true;const r=parseInt(hex.slice(1,3),16)/255,g=parseInt(hex.slice(3,5),16)/255,b=parseInt(hex.slice(5,7),16)/255;const mx=Math.max(r,g,b),mn=Math.min(r,g,b),light=(mx+mn)/2;const sat=mx===mn?0:(mx-mn)/(1-Math.abs(2*light-1));return sat<.46};
-const uid=()=>globalThis.crypto?.randomUUID?.()||`tf-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-const iso=(d=new Date())=>[d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-');
-const parseDate=s=>s?new Date(`${s}T12:00:00`):null;
-const addDays=(s,n)=>{const d=parseDate(s);d.setDate(d.getDate()+n);return iso(d)};
 const fmtDate=s=>s?parseDate(s)?.toLocaleDateString(undefined,{month:'short',day:'numeric'}):'';
-const cleanColor=x=>/^#[0-9a-fA-F]{6}$/.test(x||'')?x:'#27d2f3';
 const activeTasks=()=>S.tasks.filter(t=>t.status!=='deleted');
 const openTasks=()=>S.tasks.filter(t=>t.status==='open');
 const completedTasks=()=>S.tasks.filter(t=>t.status==='completed');
@@ -27,15 +23,9 @@ let gmailAccessToken='',gmailExpiresAt=0,gmailChecking=false,gmailMatchPreview=[
 let emailPanel='triage',ordersScanning=false,ordersShowArchived=false,orderScanStatus='';
 let S=null,route='home',taskFilter='open',taskCategory='',taskQuery='',taskProject='',taskCount=40,reviewCount=12,selected=new Set(),projectCategory='',editingOrder=false,showAllProjectCategories=true,toastHandle=null,projectView='',oldStorageCandidate=null;
 // Focus is a daily selection of existing tasks, independent of deadlines.
-const FOCUS_LIMIT=5;
 let focusPickerQuery='',editingFocus=false;
-function normalizeFocus(value,tasks,today=iso()){
- const f=value&&typeof value==='object'?value:{};
- const valid=new Set(tasks.filter(t=>t.status!=='deleted').map(t=>t.id));
- const ids=Array.isArray(f.ids)?[...new Set(f.ids)].filter(id=>valid.has(id)).slice(0,FOCUS_LIMIT):[];
- const carryoverIds=Array.isArray(f.carryoverIds)?[...new Set(f.carryoverIds)].filter(id=>tasks.some(t=>t.id===id&&t.status==='open')&&!ids.includes(id)):[];
- return {date:/^\d{4}-\d{2}-\d{2}$/.test(f.date||'')?f.date:today,ids,carryoverIds};
-}
+let notesTimer=null,importFile=null,importProjectChoice='__new__',mergeTargetPreset='';
+let pendingFocusCelebration=false,autoScanRunning=false,lastAutoAttempt=0;
 function refreshFocus(today=iso()){
  const before=JSON.stringify(S.focus);
  const f=normalizeFocus(S.focus,S.tasks,today);
@@ -72,11 +62,16 @@ function focusCandidates(){
 }
 function focusRow(t,done=false){
  const list=focusTasks().filter(x=>x.status!=='completed'),idx=list.findIndex(x=>x.id===t.id);
- return `<div class="focus-row"><button class="checkbox ${done?'checked':''}" data-act="toggle-task" data-id="${esc(t.id)}" aria-label="${done?'Reopen':'Complete'} ${esc(t.title)}">${done?'✓':''}</button><div class="focus-task"><button class="focus-title ${done?'focus-done-title':''}" data-act="edit-task" data-id="${esc(t.id)}">${esc(t.title)}</button><div class="focus-meta">${checklistProgress(t)} ${esc(t.category||'Inbox')}${t.dueDate?` · Due ${esc(fmtDate(t.dueDate))}`:''}</div></div>${editingFocus?`<div class="focus-controls">${!done?`<button class="btn focus-icon" data-act="focus-move" data-id="${esc(t.id)}" data-delta="-1" aria-label="Move ${esc(t.title)} up" ${idx===0?'disabled':''}>↑</button><button class="btn focus-icon" data-act="focus-move" data-id="${esc(t.id)}" data-delta="1" aria-label="Move ${esc(t.title)} down" ${idx===list.length-1?'disabled':''}>↓</button>`:''}<button class="btn focus-icon" data-act="focus-remove" data-id="${esc(t.id)}" aria-label="Remove ${esc(t.title)} from Today">×</button></div>`:''}</div>`;
+ return `<div class="focus-row" style="--cat:${categoryColor(t.category)}"><button class="checkbox ${done?'checked':''}" data-act="toggle-task" data-id="${esc(t.id)}" aria-label="${done?'Reopen':'Complete'} ${esc(t.title)}">${done?'✓':''}</button><div class="focus-task"><button class="focus-title ${done?'focus-done-title':''}" data-act="edit-task" data-id="${esc(t.id)}">${esc(t.title)}</button><div class="focus-meta">${checklistProgress(t)} ${esc(t.category||'Inbox')}${t.dueDate?` · Due ${esc(fmtDate(t.dueDate))}`:''}</div></div>${editingFocus?`<div class="focus-controls">${!done?`<button class="btn focus-icon" data-act="focus-move" data-id="${esc(t.id)}" data-delta="-1" aria-label="Move ${esc(t.title)} up" ${idx===0?'disabled':''}>↑</button><button class="btn focus-icon" data-act="focus-move" data-id="${esc(t.id)}" data-delta="1" aria-label="Move ${esc(t.title)} down" ${idx===list.length-1?'disabled':''}>↓</button>`:''}<button class="btn focus-icon" data-act="focus-remove" data-id="${esc(t.id)}" aria-label="Remove ${esc(t.title)} from Today">×</button></div>`:''}</div>`;
 }
 function renderFocus(){
  const tasks=focusTasks(),done=tasks.filter(t=>t.status==='completed'),pending=tasks.filter(t=>t.status==='open');
- return `<section class="card focus-card" aria-labelledby="focus-heading"><div class="card-head"><div><div class="eyebrow">${esc(new Date().toLocaleDateString(undefined,{weekday:'long',month:'short',day:'numeric'}))}</div><h1 id="focus-heading">Today's Focus</h1></div><button class="btn btn-accent" data-act="focus-picker">Choose tasks</button></div><div class="focus-progress">${tasks.length?`<button class="focus-edit" data-act="focus-edit" aria-pressed="${editingFocus}">${editingFocus?'Done editing':'Edit list'}</button>`:''}<span>${tasks.length?`${done.length} of ${tasks.length} done`:'Start with 3 · Up to 5 tasks'}</span>${tasks.length?`<progress value="${done.length}" max="${tasks.length}" aria-label="Today's Focus completed tasks"></progress>`:''}</div>${pending.map(t=>focusRow(t)).join('')}${!tasks.length?'<p class="focus-empty">What would make today feel productive?<br>Choose a few tasks to keep in sight.</p>':''}${tasks.length&&!pending.length?'<p class="focus-success">Today’s focus is complete. Nicely done.</p>':''}${done.length?`<details class="focus-completed"><summary>Completed today (${done.length})</summary>${done.map(t=>focusRow(t,true)).join('')}</details>`:''}${S.focus.carryoverIds.length?`<div class="focus-carry"><span>${S.focus.carryoverIds.length} unfinished from a previous day</span><button class="btn" data-act="focus-picker">Review</button></div>`:''}</section>`;
+ const celebrate=pendingFocusCelebration&&tasks.length>0&&!pending.length;
+ if(celebrate) pendingFocusCelebration=false;
+ const reduce=prefersReducedMotion();
+ const burst=celebrate&&!reduce?`<span class="focus-burst" aria-hidden="true">${[0,1,2,3,4,5].map(i=>`<i style="--x:${[0,18,-16,22,-20,8][i]}px;--y:${[-18,-8,-16,6,8,-22][i]}px"></i>`).join('')}</span>`:'';
+ const dateLabel=esc(new Date().toLocaleDateString(undefined,{weekday:'long',month:'short',day:'numeric'}));
+ return `<section class="card focus-card ${celebrate?'is-celebrating':''}" aria-labelledby="focus-heading"><div class="focus-kicker"><div class="eyebrow">${dateLabel}</div><button class="btn btn-accent" data-act="focus-picker">Choose tasks</button></div><div class="focus-hero-row"><div><h1 id="focus-heading">Today's Focus</h1><p class="focus-count">${tasks.length?`${done.length} of ${tasks.length} done`:'Start with 3 · Up to 5 tasks'}</p></div>${garminRing(done.length,tasks.length)}</div>${tasks.length?`<div class="focus-tools"><button class="focus-edit" data-act="focus-edit" aria-pressed="${editingFocus}">${editingFocus?'Done editing':'Edit list'}</button></div>`:''}${pending.map(t=>focusRow(t)).join('')}${!tasks.length?'<p class="focus-empty">What would make today feel productive?<br>Choose a few tasks to keep in sight.</p>':''}${tasks.length&&!pending.length?`<div class="focus-success ${celebrate?'is-celebrating':''}" role="status">${burst}<p>Today’s focus is complete. Nicely done.</p></div>`:''}${done.length?`<details class="focus-completed"><summary>Completed today (${done.length})</summary>${done.map(t=>focusRow(t,true)).join('')}</details>`:''}${S.focus.carryoverIds.length?`<div class="focus-carry"><span>${S.focus.carryoverIds.length} unfinished from a previous day</span><button class="btn" data-act="focus-picker">Review</button></div>`:''}</section>`;
 }
 function focusPickRow(t,carry=false){return `<div class="focus-pick-row"><div class="focus-task"><strong>${esc(t.title)}</strong><div class="focus-meta">${esc(t.category||'Inbox')} · ${esc(focusReason(t))}</div></div><div class="focus-pick-actions"><button class="btn btn-accent" data-act="focus-add" data-id="${esc(t.id)}" ${S.focus.ids.length>=FOCUS_LIMIT?'disabled':''}>${carry?'Keep today':'Do today'}</button>${carry?`<button class="btn" data-act="focus-later" data-id="${esc(t.id)}">Later</button>`:''}</div></div>`}
 function renderFocusPickerResults(){
@@ -89,33 +84,33 @@ function renderFocusPickerResults(){
 function openFocusPicker(){refreshFocus();focusPickerQuery='';showModal('Choose today’s focus',`<p id="focus-picker-count" class="focus-meta"></p><input id="focus-search" class="focus-search" type="search" placeholder="Search all open tasks" aria-label="Search focus tasks"><div id="focus-picker-results"></div><div class="modal-actions"><button class="btn" data-act="close-modal">Done</button></div>`);renderFocusPickerResults()}
 function moveFocus(id,delta){refreshFocus();const active=focusTasks().filter(t=>t.status==='open').map(t=>t.id),other=active[active.indexOf(id)+delta];if(!other)return;const a=S.focus.ids.indexOf(id),b=S.focus.ids.indexOf(other);[S.focus.ids[a],S.focus.ids[b]]=[S.focus.ids[b],S.focus.ids[a]];save()}
 
-function normalize(x){
- const d=JSON.parse(JSON.stringify(x||{}));
- d.schemaVersion=5;d.categories=Array.isArray(d.categories)?d.categories:[];d.projects=Array.isArray(d.projects)?d.projects:[];d.tasks=Array.isArray(d.tasks)?d.tasks:[];d.habits=Array.isArray(d.habits)?d.habits:[];d.history=d.history&&typeof d.history==='object'?d.history:{};
- d.orders=Array.isArray(d.orders)?d.orders:[];d.orders.forEach(o=>{o.sourceEmailIds=Array.isArray(o.sourceEmailIds)?o.sourceEmailIds:[];o.archived=!!o.archived});d.emailProposals=Array.isArray(d.emailProposals)?d.emailProposals:[];d.preferences=d.preferences||{};d.categoryOrder=Array.isArray(d.categoryOrder)?d.categoryOrder:[];d.projectOrder=Array.isArray(d.projectOrder)?d.projectOrder:[];
- d.settings=d.settings||{};d.settings.accent=d.settings.accent||'cyan';d.settings.vivid=d.settings.vivid!==false;d.settings.defaultRoute=d.settings.defaultRoute||'home';d.settings.gmailClientId=typeof d.settings.gmailClientId==='string'?d.settings.gmailClientId:'';
- d.categories.forEach(c=>{if(!c.name)return;if(!c.colorBeforeV5){c.colorBeforeV5=c.color; if(d.settings.vivid&&VIVID[c.name]&&isMutedColor(c.color))c.color=VIVID[c.name];}c.color=cleanColor(c.color);c.visible=c.visible!==false});
- d.tasks.forEach(t=>{if(!t.id)t.id=uid();t.status=t.status||'open';if(t.reviewed==null)t.reviewed=false;if(t.category==null)t.category='Inbox';if(!t.priority)t.priority='normal';if(t.checklist!==undefined)t.checklist=normalizeChecklist(t.checklist);});
- d.habits.forEach(h=>{if(!h.schedule)h.schedule={frequency:'daily',weekdays:[],monthDay:1,anchorDate:iso()};if(!h.target)h.target=1});
- d.categoryOrder=[...new Set([...d.categoryOrder,...d.categories.map(c=>c.name)])].filter(name=>d.categories.some(c=>c.name===name));
- d.projectOrder=[...new Set([...d.projectOrder,...d.projects.map(p=>p.id)])].filter(id=>d.projects.some(p=>p.id===id));
- d.focus=normalizeFocus(d.focus,d.tasks);
- d.lastUpdatedAt=new Date().toISOString();return d;
-}
-function readState(){try{const r=localStorage.getItem(STORE);return r?normalize(JSON.parse(r)):null}catch(e){console.error(e);return null}}
 function save(renderNow=true){S.lastUpdatedAt=new Date().toISOString();try{localStorage.setItem(STORE,JSON.stringify(S))}catch(e){alert('Unable to save locally. Export a backup before continuing. '+e.message)}if(renderNow)render()}
 function migrateLegacyCandidate(){
  const cand=[];try{for(const k of Object.keys(localStorage)){if(k===STORE)continue;let d;try{d=JSON.parse(localStorage.getItem(k)||'')}catch{continue}if(d&&Array.isArray(d.tasks)&&d.tasks.length&&Array.isArray(d.categories))cand.push({key:k,obj:d})}}catch{};
  cand.sort((a,b)=>b.obj.tasks.length-a.obj.tasks.length);return cand[0]||null;
 }
 async function initialize(){
- S=readState();oldStorageCandidate=migrateLegacyCandidate();
-  if(!S){try{const v=localStorage.getItem('task-forge-v5.3-state');if(v){const d=JSON.parse(v);if(Array.isArray(d.tasks)&&Array.isArray(d.categories))S=normalize(d)}}catch(e){console.warn('v5.3 migration failed',e)}}
- if(!S){try{const prior=localStorage.getItem('task-forge-v5-state');if(prior){const parsed=JSON.parse(prior);if(Array.isArray(parsed.tasks)&&Array.isArray(parsed.habits)){S=normalize(parsed);save(false)}}}catch(e){console.warn('v5.2 migration unavailable',e)}}
- if(!S){try{const r=await fetch('./data/initial-backup.json',{cache:'no-cache'});if(!r.ok)throw Error('No bundled backup');S=normalize(await r.json())}catch(e){console.error(e);S=normalize({tasks:[],categories:[],projects:[],habits:[],history:{}})}save(false)}
- const color=S.settings.accent;setAccent(color);route=(location.hash.slice(1).split('/')[0]||S.settings.defaultRoute||'home');
- const valid=['home','tasks','review','projects','routines','email','settings'];if(!valid.includes(route))route='home';
- if(S.settings.gmailClientId)restoreGmailSession();bindEvents();render();if(S.settings.gmailClientId)loadGoogleIdentity().catch(console.warn);document.addEventListener('visibilitychange',()=>{if(!document.hidden)render()});window.addEventListener('pageshow',()=>render());if('serviceWorker'in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('./sw.js').catch(console.warn);
+ const loaded=TF.loadPersistedState(localStorage);
+ S=loaded.state;
+ if(loaded.error) alert('Older Task Forge data loaded, but it could not be saved in this browser. Export a backup before continuing. '+(loaded.error.message||loaded.error));
+ oldStorageCandidate=migrateLegacyCandidate();
+ if(loaded.migratedFrom&&oldStorageCandidate&&oldStorageCandidate.key===(loaded.migratedFrom==='v5.3'?TF.V53_KEY:TF.V52_KEY)) oldStorageCandidate=null;
+ if(!S){
+  try{const r=await fetch('./data/initial-backup.json',{cache:'no-cache'});if(!r.ok)throw Error('No bundled backup');S=normalize(await r.json())}
+  catch(e){console.error(e);S=normalize({tasks:[],categories:[],projects:[],habits:[],history:{}})}
+  save(false);
+ }
+ setAccent(S.settings.accent);
+ route=(location.hash.slice(1).split('/')[0]||S.settings.defaultRoute||'home');
+ const valid=['home','tasks','review','projects','routines','email','settings'];
+ if(!valid.includes(route)) route='home';
+ if(S.settings.gmailClientId) restoreGmailSession();
+ bindEvents();
+ render();
+ if(S.settings.gmailClientId) loadGoogleIdentity().catch(console.warn);
+ document.addEventListener('visibilitychange',()=>{if(document.hidden)return;if(canQuietlyRefresh())render();autoScanIfReady('visible')});
+ window.addEventListener('pageshow',()=>{if(canQuietlyRefresh())render()});
+ if('serviceWorker' in navigator&&location.protocol.startsWith('http')) navigator.serviceWorker.register('./sw.js').catch(console.warn);
 }
 function setAccent(color){document.documentElement.style.setProperty('--accent',({cyan:'#27d2f3',orange:'#ff9f58',violet:'#b29aff',green:'#4adfa8'}[color]||'#27d2f3'))}
 function navigate(to){projectView='';route=to;location.hash=to;selected.clear();render();window.scrollTo({top:0,behavior:'instant'})}
@@ -129,7 +124,7 @@ function options(items,val,placeholder=''){return (placeholder?`<option value=""
 function categoryOptions(v){return options(orderedCategories().map(c=>({value:c.name,label:c.name})),v,'Uncategorized')}
 function projectOptions(v,category=''){return options(orderedProjects().filter(p=>!category||p.category===category).map(p=>({value:p.id,label:p.name})),v,'No project')}
 function priorityOptions(v){return options(['low','normal','high','urgent'].map(x=>({value:x,label:x[0].toUpperCase()+x.slice(1)})),v)}
-function taskRow(t){let done=t.status==='completed';return `<div class="task-row"><button class="checkbox ${done?'checked':''}" data-act="toggle-task" data-id="${esc(t.id)}" aria-label="${done?'Reopen':'Complete'} ${esc(t.title)}">${done?'✓':''}</button><div class="task-content" data-act="edit-task" data-id="${esc(t.id)}"><div class="task-title" style="${done?'text-decoration:line-through;color:var(--muted)':''}">${esc(t.title)}</div><div class="task-meta">${checklistProgress(t)}${pill(t.category)}${t.projectId?`<span class="tag">${esc(categoryName(t.projectId))}</span>`:''}${t.dueDate?`<span class="mono" style="color:${t.dueDate<iso()?'var(--red)':'var(--muted)'}">${esc(fmtDate(t.dueDate))}</span>`:''}${t.priority==='urgent'||t.priority==='high'?priorityPill(t.priority):''}</div></div>${!done?`<button class="btn task-today ${S.focus.ids.includes(t.id)?'is-today':''}" data-act="${S.focus.ids.includes(t.id)?'focus-remove':'focus-add'}" data-id="${esc(t.id)}" aria-label="${S.focus.ids.includes(t.id)?'Remove from Today:':'Do today:'} ${esc(t.title)}">${S.focus.ids.includes(t.id)?'✓ Today':'Do today'}</button>`:''}<button data-act="edit-task" data-id="${esc(t.id)}" class="task-more" aria-label="Edit task">›</button></div>`}
+function taskRow(t){let done=t.status==='completed';return `<div class="task-row" style="--cat:${categoryColor(t.category)}"><button class="checkbox ${done?'checked':''}" data-act="toggle-task" data-id="${esc(t.id)}" aria-label="${done?'Reopen':'Complete'} ${esc(t.title)}">${done?'✓':''}</button><div class="task-content" data-act="edit-task" data-id="${esc(t.id)}"><div class="task-title" style="${done?'text-decoration:line-through;color:var(--muted)':''}">${esc(t.title)}</div><div class="task-meta">${checklistProgress(t)}${pill(t.category)}${t.projectId?`<span class="tag">${esc(categoryName(t.projectId))}</span>`:''}${t.dueDate?`<span class="mono" style="color:${t.dueDate<iso()?'var(--red)':'var(--muted)'}">${esc(fmtDate(t.dueDate))}</span>`:''}${t.priority==='urgent'||t.priority==='high'?priorityPill(t.priority):''}</div></div>${!done?`<button class="btn task-today ${S.focus.ids.includes(t.id)?'is-today':''}" data-act="${S.focus.ids.includes(t.id)?'focus-remove':'focus-add'}" data-id="${esc(t.id)}" aria-label="${S.focus.ids.includes(t.id)?'Remove from Today:':'Do today:'} ${esc(t.title)}">${S.focus.ids.includes(t.id)?'✓ Today':'Do today'}</button>`:''}<button data-act="edit-task" data-id="${esc(t.id)}" class="task-more" aria-label="Edit task">›</button></div>`}
 function sortedTasks(arr){return [...arr].sort((a,b)=>{const da=a.dueDate||'9999-99-99',db=b.dueDate||'9999-99-99';const p={urgent:0,high:1,normal:2,low:3};return da.localeCompare(db)||(p[a.priority]??2)-(p[b.priority]??2)||a.title.localeCompare(b.title)})}
 function noteworthyRoutine(h){return !['daily','weekdays'].includes(h.schedule?.frequency||'daily')}
 function routineAlerts(today=iso()){
@@ -150,18 +145,23 @@ function renderRoutineAlert(){const {due,tomorrowDue,today}=routineAlerts();
 function renderHome(){const st=totalStats();const now=new Date();const today=iso();const upcoming=sortedTasks(openTasks().filter(t=>!S.focus.ids.includes(t.id))).slice(0,7);const todayRoutines=S.habits.filter(h=>scheduledFor(h,today));const reviews=todoReviews().length;
  return `${renderFocus()}
  <div class="home-stats" aria-label="Dashboard totals"><button data-route="tasks"><b>${st.open}</b><span>Open</span></button><button data-route="review"><b>${st.review}</b><span>Review</span></button><button data-route="projects"><b>${st.project}</b><span>Projects</span></button><button data-act="focus-completed-tasks"><b>${st.completed}</b><span>Completed</span></button></div>
- ${renderRoutineAlert()}<div class="layout-2"><section><div class="card"><div class="card-head"><h2>Up next</h2><button class="icon-action" data-route="tasks">All tasks →</button></div>${upcoming.length?upcoming.map(taskRow).join(''):'<div class="empty">No other open tasks.</div>'}</div>
- <div class="card"><div class="card-head"><h2>Today's routines</h2><button class="icon-action" data-route="routines">Manage →</button></div>${todayRoutines.length?todayRoutines.map(h=>routineRow(h,today)).join(''):'<div class="empty">Nothing scheduled today</div>'}</div></section>
+ ${(S.settings.gmailClientId||S.settings.gmailLastScanAt||S.settings.lastOrderScanAt)?`<p class="last-checked" id="last-checked">${esc(lastCheckedText())}</p>`:''}${renderRoutineAlert()}<div class="layout-2"><section><div class="card flat-card"><div class="card-head"><h2>Up next</h2><button class="icon-action" data-route="tasks">All tasks →</button></div>${upcoming.length?upcoming.map(taskRow).join(''):'<div class="empty">No other open tasks.</div>'}</div>
+ <div class="card flat-card"><div class="card-head"><h2>Today's routines</h2><button class="icon-action" data-route="routines">Manage →</button></div>${todayRoutines.length?todayRoutines.map(h=>routineRow(h,today)).join(''):'<div class="empty">Nothing scheduled today</div>'}</div></section>
  <section><div class="card"><div class="card-head"><h2>Overall progress</h2><span class="count">${st.tasks} total</span></div><div class="progress-row"><div class="ring" style="--pct:${st.completion}"><strong>${st.completion}%</strong></div><div><div class="title2">${st.completed} completed</div><div class="subtle">${st.open} left to finish</div><div class="progress-line" style="width:120px"><div class="progress-fill" style="width:${st.completion}%"></div></div></div></div></div>
  <div class="card"><div class="card-head"><h2>Orders & deliveries</h2><button class="icon-action" data-act="go-orders">View orders →</button></div><div class="grid-metrics"><div class="metric" style="--c:var(--cyan)"><small>Awaiting delivery</small><b>${S.orders.filter(o=>!o.archived&&!['Delivered','Return completed'].includes(o.status)).length}</b></div><div class="metric" style="--c:var(--green)"><small>Delivered</small><b>${S.orders.filter(o=>!o.archived&&o.status==='Delivered').length}</b></div></div><p class="subtle">Scan Gmail to discover orders, shipping updates and returns.</p></div><div class="card"><div class="card-head"><h2>Inbox triage</h2><button class="icon-action" data-route="review">Review →</button></div><div class="grid-metrics" style="margin-bottom:0"><div class="metric" style="--c:var(--orange)"><small>Tasks</small><b>${reviews}</b></div><div class="metric" style="--c:var(--purple)"><small>Email</small><b>${S.emailProposals.filter(p=>p.status==='pending').length}</b></div></div>${reviews?'<p class="subtle">Bulk-select and delete old imported tasks in Review.</p>':''}</div>
- <div class="card"><div class="card-head"><h2>Project pulse</h2><button class="icon-action" data-route="projects">Projects →</button></div>${orderedProjects().map(p=>{let ts=activeTasks().filter(t=>t.projectId===p.id);return ts.length?`<div style="margin-bottom:13px"><div style="display:flex;justify-content:space-between;font-size:12px"><b>${esc(p.name)}</b><span class="muted">${ts.filter(t=>t.status==='completed').length}/${ts.length}</span></div><div class="progress-line"><div class="progress-fill" style="width:${ts.length?ts.filter(t=>t.status==='completed').length/ts.length*100:0}%"></div></div></div>`:''}).filter(Boolean).slice(0,5).join('')||'<div class="empty">No project tasks</div>'}</div></section></div>`;
+ <div class="card"><div class="card-head"><h2>Project pulse</h2><button class="icon-action" data-route="projects">Projects →</button></div>${orderedProjects().map(p=>{let ts=activeTasks().filter(t=>t.projectId===p.id);return ts.length?`<div class="pulse-row">${miniRing(ts.length?Math.round(ts.filter(t=>t.status==='completed').length/ts.length*100):0, categoryColor(p.category))}<div class="pulse-copy"><b>${esc(p.name)}</b><span class="muted">${ts.filter(t=>t.status==='completed').length}/${ts.length}</span></div></div>`:''}).filter(Boolean).slice(0,5).join('')||'<div class="empty">No project tasks</div>'}</div></section></div>`;
 }
 function renderTasks(){const ts=activeTasks().filter(t=>{if(taskFilter==='open'&&t.status!=='open')return false;if(taskFilter==='completed'&&t.status!=='completed')return false;if(taskFilter==='unreviewed'&&(t.reviewed||t.status!=='open'))return false;if(taskCategory&&t.category!==taskCategory)return false;if(taskProject&&t.projectId!==taskProject)return false;return !taskQuery||`${t.title} ${t.notes||''}`.toLowerCase().includes(taskQuery.toLowerCase())});
  const rows=sortedTasks(ts);return header('TASK MANAGER','All tasks',`${ts.length} matching tasks`,`<button class="btn btn-accent btn-tiny" data-act="new-task">+ Add</button>`)+`<div class="filterbar"><input id="task-search" type="search" placeholder="Search tasks..." value="${esc(taskQuery)}" aria-label="Search tasks"/><select id="task-category" aria-label="Filter category">${categoryOptions(taskCategory)}</select><select id="task-project" aria-label="Filter project">${projectOptions(taskProject)}</select></div><div class="filterbar">${['open','all','completed','unreviewed'].map(x=>`<button data-act="filter-tasks" data-filter="${x}" class="filter-chip ${taskFilter===x?'active':''}">${x==='unreviewed'?'Needs review':x[0].toUpperCase()+x.slice(1)}</button>`).join('')}</div><div class="card">${rows.length?rows.slice(0,taskCount).map(taskRow).join(''):'<div class="empty">No tasks match these filters.</div>'}${rows.length>taskCount?`<button class="btn btn-quiet" data-act="more-tasks" style="width:100%;margin-top:10px">Show ${Math.min(40,rows.length-taskCount)} more</button>`:''}</div>`}
 function reviewItem(t){return `<div class="review-item" data-review="${esc(t.id)}"><div class="review-top"><input class="select-review" type="checkbox" data-act="select-review" data-id="${esc(t.id)}" aria-label="Select task" ${selected.has(t.id)?'checked':''}/><div class="review-text"><div class="review-title">${esc(t.title)}</div><div class="task-meta">${priorityPill(t.priority)}<span>${esc(t.source||'Imported')}</span>${t.parentId?'<span class="tag">Subtask</span>':''}</div></div></div>${t.notes?`<div class="subtle" style="margin:9px 0">${esc(t.notes)}</div>`:''}<div class="review-form"><select data-field="category" data-id="${esc(t.id)}" aria-label="Task category">${categoryOptions(t.category)}</select><select data-field="projectId" data-id="${esc(t.id)}" aria-label="Task project">${projectOptions(t.projectId,t.category)}</select><select data-field="priority" data-id="${esc(t.id)}" aria-label="Task priority">${priorityOptions(t.priority)}</select><input data-field="dueDate" data-id="${esc(t.id)}" aria-label="Due date" type="date" value="${esc(t.dueDate||'')}" /></div><div class="review-actions"><button class="btn btn-success" data-act="keep-review" data-id="${esc(t.id)}">✓ Keep</button><button class="btn btn-quiet" data-act="complete-review" data-id="${esc(t.id)}">✓ Done</button><button class="btn btn-danger" data-act="delete-task" data-id="${esc(t.id)}">Trash</button></div></div>`}
 function renderReview(){const arr=todoReviews(),processed=activeTasks().filter(t=>t.reviewed).length,all=activeTasks().length;return header('INBOX ZERO','Task review',`${arr.length} left · Bulk deletion enabled`,`<button class="btn btn-quiet btn-tiny" data-act="go-trash">Trash (${S.tasks.filter(t=>t.status==='deleted').length})</button>`)+`<div class="card"><div class="card-head"><h2>${arr.length?'Imported task queue':'Review complete'}</h2><span class="count">${processed} / ${all} reviewed</span></div><div class="review-progress"><span style="width:${all?processed/all*100:100}%"></span></div><div class="subtle" style="margin-top:10px">Select multiple irrelevant entries to delete together. Deleted tasks stay recoverable in Trash for 30 days.</div></div>${arr.length?`<div class="bulkbar"><button class="btn btn-quiet btn-tiny" data-act="select-visible">Select visible</button><button class="btn btn-quiet btn-tiny" data-act="select-all-pending">Select all ${arr.length}</button><span class="subtle">${selected.size} selected</span><button class="btn btn-success btn-tiny" data-act="bulk-keep" ${!selected.size?'disabled':''}>Keep selected</button><button class="btn btn-danger btn-tiny" data-act="bulk-delete" ${!selected.size?'disabled':''}>Delete selected</button><button class="icon-action" data-act="clear-selection">Clear</button></div>${arr.slice(0,reviewCount).map(reviewItem).join('')}${arr.length>reviewCount?`<button class="btn btn-quiet" data-act="more-review" style="width:100%">Show more (${arr.length-reviewCount} remaining)</button>`:''}`:`<div class="card"><div class="empty">All current tasks have been reviewed.</div></div>`}`}
-function renderProjects(){if(projectView)return renderProjectDetail(projectView);const cat=orderedCategories();return header('YOUR WORKSTREAMS','Projects & categories','Reorder, recolor, and track progress',`<button class="btn btn-quiet btn-tiny" data-act="toggle-order">${editingOrder?'Done':'Edit order'}</button><button class="btn btn-accent btn-tiny" data-act="new-category">+ Category</button>`)+`<div class="info-note">${editingOrder?'Use ↑ ↓ to reorder categories and projects. Changes save immediately.':'Your chosen category colors appear on project cards, tasks and charts. Use Edit order to bring To Do to the top.'}</div>${cat.map(c=>{const p=orderedProjects().filter(p=>p.category===c.name);const ts=activeTasks().filter(t=>t.category===c.name);const done=ts.filter(t=>t.status==='completed').length;const percentage=ts.length?Math.round(done/ts.length*100):0;return `<section class="card" style="border-top:3px solid ${cleanColor(c.color)}"><div class="card-head"><div><div class="small-heading" style="color:${cleanColor(c.color)}">${esc(c.name)} · ${ts.length} tasks</div><h2>${esc(c.name)} <span style="font-size:13px;color:var(--muted)">${percentage}%</span></h2></div><div class="actions">${editingOrder?`<button class="btn btn-tiny" data-act="move-cat" data-id="${esc(c.name)}" data-delta="-1">↑</button><button class="btn btn-tiny" data-act="cat-to-top" data-id="${esc(c.name)}">Top</button><button class="btn btn-tiny" data-act="move-cat" data-id="${esc(c.name)}" data-delta="1">↓</button>`:''}<button class="icon-action" data-act="edit-category" data-id="${esc(c.name)}">Edit</button></div></div><div class="progress-line"><div class="progress-fill" style="width:${percentage}%;background:${cleanColor(c.color)}"></div></div><div class="project-list" style="margin-top:12px">${p.map(pr=>{let pt=activeTasks().filter(t=>t.projectId===pr.id),pc=pt.length?Math.round(pt.filter(t=>t.status==='completed').length/pt.length*100):0;return `<div class="project-tile" style="--c:${cleanColor(c.color)}" data-act="open-project" data-id="${esc(pr.id)}"><strong>${esc(pr.name)}</strong><div class="number">${pc}%</div><div class="subtle">${pt.length} tasks</div>${editingOrder?`<div class="actions" style="margin-top:6px"><button class="btn btn-tiny" data-act="move-project" data-id="${esc(pr.id)}" data-delta="-1">↑</button><button class="btn btn-tiny" data-act="move-project" data-id="${esc(pr.id)}" data-delta="1">↓</button><button class="btn btn-tiny" data-act="edit-project" data-id="${esc(pr.id)}">Edit</button></div>`:''}</div>`}).join('')}${p.length?'':`<div class="subtle">No projects in this category</div>`}</div><div class="actions" style="margin-top:14px"><button class="btn btn-tiny" data-act="new-project" data-category="${esc(c.name)}">+ Project</button><button class="btn btn-tiny" data-act="show-category-tasks" data-category="${esc(c.name)}">View all tasks</button></div></section>`}).join('')}`}
-function renderProjectDetail(id){const p=S.projects.find(p=>p.id===id);if(!p){projectView='';return renderProjects()}const ts=activeTasks().filter(t=>t.projectId===id),done=ts.filter(t=>t.status==='completed').length,pc=ts.length?Math.round(100*done/ts.length):0;return header(p.category,p.name,`${ts.length} tasks · ${pc}% complete`,`<button class="btn btn-tiny" data-act="back-projects">← Back</button><button class="btn btn-tiny" data-act="edit-project" data-id="${esc(p.id)}">Edit</button>`)+`<div class="card"><div class="progress-row"><div class="ring" style="--pct:${pc}"><strong>${pc}%</strong></div><div><b>${done} of ${ts.length} completed</b><div class="subtle">${ts.length-done} still open</div></div></div></div><div class="card"><div class="card-head"><h2>Project tasks</h2><button class="btn btn-tiny btn-accent" data-act="new-task" data-project="${esc(p.id)}">+ Task</button></div>${sortedTasks(ts).map(taskRow).join('')||'<div class="empty">No tasks yet</div>'}</div>`}
+function renderProjects(){if(projectView)return renderProjectDetail(projectView);const cat=orderedCategories();return header('YOUR WORKSTREAMS','Projects & categories','Reorder, recolor, and track progress',`<button class="btn btn-quiet btn-tiny" data-act="toggle-order">${editingOrder?'Done':'Edit order'}</button><button class="btn btn-tiny" data-act="import-file">Import</button><button class="btn btn-accent btn-tiny" data-act="new-category">+ Category</button>`)+`<div class="info-note">${editingOrder?'Use ↑ ↓ to reorder categories and projects. Changes save immediately.':'Your chosen category colors appear on project cards, tasks and charts. Use Edit order to bring To Do to the top.'}</div>${cat.map(c=>{const p=orderedProjects().filter(p=>p.category===c.name);const ts=activeTasks().filter(t=>t.category===c.name);const done=ts.filter(t=>t.status==='completed').length;const percentage=ts.length?Math.round(done/ts.length*100):0;return `<section class="card" style="border-top:3px solid ${cleanColor(c.color)}"><div class="card-head"><div><div class="small-heading" style="color:${cleanColor(c.color)}">${esc(c.name)} · ${ts.length} tasks</div><h2>${esc(c.name)} <span style="font-size:13px;color:var(--muted)">${percentage}%</span></h2></div><div class="actions">${editingOrder?`<button class="btn btn-tiny" data-act="move-cat" data-id="${esc(c.name)}" data-delta="-1">↑</button><button class="btn btn-tiny" data-act="cat-to-top" data-id="${esc(c.name)}">Top</button><button class="btn btn-tiny" data-act="move-cat" data-id="${esc(c.name)}" data-delta="1">↓</button>`:''}<button class="icon-action" data-act="edit-category" data-id="${esc(c.name)}">Edit</button></div></div><div class="progress-line"><div class="progress-fill" style="width:${percentage}%;background:${cleanColor(c.color)}"></div></div><div class="project-list" style="margin-top:12px">${p.map(pr=>{let pt=activeTasks().filter(t=>t.projectId===pr.id),pc=pt.length?Math.round(pt.filter(t=>t.status==='completed').length/pt.length*100):0;return `<div class="project-tile" style="--c:${cleanColor(c.color)}" data-act="open-project" data-id="${esc(pr.id)}"><div class="project-tile-top">${miniRing(pc,c.color)}<div class="project-tile-copy"><strong>${esc(pr.name)}</strong><div class="subtle">${pt.length} tasks${pr.notes&&pr.notes.entries&&pr.notes.entries.length?` · ${pr.notes.entries.length} notes`:''}</div></div></div>${editingOrder?`<div class="actions" style="margin-top:6px"><button class="btn btn-tiny" data-act="move-project" data-id="${esc(pr.id)}" data-delta="-1">↑</button><button class="btn btn-tiny" data-act="move-project" data-id="${esc(pr.id)}" data-delta="1">↓</button><button class="btn btn-tiny" data-act="edit-project" data-id="${esc(pr.id)}">Edit</button></div>`:''}</div>`}).join('')}${p.length?'':`<div class="subtle">No projects in this category</div>`}</div><div class="actions" style="margin-top:14px"><button class="btn btn-tiny" data-act="new-project" data-category="${esc(c.name)}">+ Project</button><button class="btn btn-tiny" data-act="show-category-tasks" data-category="${esc(c.name)}">View all tasks</button></div></section>`}).join('')}`}
+function renderProjectDetail(id){
+ const p=S.projects.find(p=>p.id===id);
+ if(!p){projectView='';return renderProjects()}
+ const ts=activeTasks().filter(t=>t.projectId===id),done=ts.filter(t=>t.status==='completed').length,pc=ts.length?Math.round(100*done/ts.length):0;
+ return header(p.category,p.name,`${ts.length} tasks · ${pc}% complete`,`<button class="btn btn-tiny" data-act="back-projects">← Back</button><button class="btn btn-tiny" data-act="import-project" data-id="${esc(p.id)}">Import</button><button class="btn btn-tiny" data-act="edit-project" data-id="${esc(p.id)}">Edit</button>`)+`<div class="card project-hero"><div class="progress-row"><div class="ring${pc===100?' is-full':''}" style="--pct:${pc}"><strong>${pc}%</strong></div><div><b>${done} of ${ts.length} completed</b><div class="subtle">${ts.length-done} still open</div></div></div></div>${renderProjectNotes(p)}<div class="card flat-card"><div class="card-head"><h2>Project tasks</h2><button class="btn btn-tiny btn-accent" data-act="new-task" data-project="${esc(p.id)}">+ Task</button></div>${sortedTasks(ts).map(taskRow).join('')||'<div class="empty">No tasks yet</div>'}</div>`;
+}
 function scheduledFor(h,date){const s=h.schedule||{frequency:'daily'},dow=weekdayNum(date),days=Array.isArray(s.weekdays)?s.weekdays.map(Number):[];switch(s.frequency){case 'weekdays':case 'weekly':return days.length?days.includes(dow):(s.frequency==='weekdays'&&dow>=1&&dow<=5);case 'biweekly':{const anchor=parseDate(s.anchorDate||date),d=parseDate(date),diff=Math.round((d-anchor)/86400000);const startDay=anchor.getDay();const weeks=Math.floor((diff+startDay)/7);return weeks>=0&&weeks%2===0&&(days.length?days.includes(dow):dow===anchor.getDay())}case 'monthly':return parseDate(date).getDate()===Number(s.monthDay||1);default:return true}}
 function routineDone(h,date){return!!S.history[h.id]?.[date]?.completed}
 function weeklyCount(h,date){let c=0;for(let i=0;i<7;i++)if(routineDone(h,addDays(date,-i)))c++;return c}
@@ -171,11 +171,11 @@ function renderRoutines(){const today=iso(),scheduled=S.habits.filter(h=>schedul
 function routineRowOther(h){const next=nextRoutineDate(h),description=next?` · Next ${fmtDate(next)}`:'';return `<div class="routine"><div class="routine-check" style="display:grid;place-items:center">◷</div><div><div class="routine-title">${esc(h.name)}</div><div class="routine-meta">${esc(routineScheduleText(h))}${esc(description)}</div></div><button class="icon-action" data-act="edit-routine" data-id="${esc(h.id)}">Edit</button></div>`}
 function renderEmail(){if(emailPanel==='orders')return renderOrders();const pending=S.emailProposals.filter(p=>p.status==='pending');const others=S.emailProposals.filter(p=>p.status!=='pending');return header('GMAIL → TASK FORGE','Email triage','Review and approve proposals before creating tasks',`<button class="btn btn-accent btn-tiny" data-act="check-gmail" ${gmailChecking?'disabled':''}>${gmailChecking?'Checking…':'Check Gmail'}</button>`)+`${renderEmailSubnav()}${renderGmailConnection()}<div class="btn-row" style="margin-bottom:14px"><button class="btn btn-quiet" data-act="import-email">Import JSON (ChatGPT triage)</button><button class="btn btn-quiet" data-act="new-email">+ Manual proposal</button></div><div class="card"><div class="card-head"><h2>Waiting for approval</h2><span class="count">${pending.length}</span></div>${pending.map(p=>`<div class="review-item email-proposal"><div class="review-title">${esc(p.subject||p.taskTitle||'Email task')}</div><div class="email-sender">${esc(p.from||'Gmail')} ${p.date?' · '+esc(fmtDate(p.date)):''}</div>${p.summary?`<p class="subtle">${esc(p.summary)}</p>`:''}<div class="review-form"><input data-email-field="taskTitle" data-id="${esc(p.id)}" value="${esc(p.taskTitle||p.subject||'')}" aria-label="Task title" /><select data-email-field="category" data-id="${esc(p.id)}" aria-label="Category">${categoryOptions(p.category)}</select><select data-email-field="priority" data-id="${esc(p.id)}" aria-label="Priority">${priorityOptions(p.priority||'normal')}</select><input data-email-field="dueDate" data-id="${esc(p.id)}" aria-label="Due date" type="date" value="${esc(p.dueDate||'')}"></div><div class="review-actions"><button class="btn btn-success" data-act="approve-email" data-id="${esc(p.id)}">✓ Approve</button><button class="btn btn-quiet" data-act="edit-email" data-id="${esc(p.id)}">Edit</button><button class="btn btn-danger" data-act="reject-email" data-id="${esc(p.id)}">Reject</button></div></div>`).join('')||'<div class="empty">No pending proposals. Check Gmail or import a JSON file.</div>'}</div><div class="card"><div class="card-head"><h2>Approval history</h2><span class="count">${others.length}</span></div>${others.slice(-15).reverse().map(p=>`<div class="task-row email-history-row"><span class="tag">${esc(p.status)}</span><div><div class="task-title">${esc(p.taskTitle||p.subject)}</div><div class="subtle">${esc(p.from||'Gmail')}</div></div></div>`).join('')||'<div class="empty">No processed emails yet</div>'}</div><div class="card"><div class="card-head"><h2>Supported JSON format</h2></div><div class="email-schema">${esc(JSON.stringify({type:'task-forge-email-proposals',version:1,proposals:[{sourceMessageId:'gmail-id',subject:'Insurance renewal notice',from:'sender@example.com',summary:'Renewal requires review',taskTitle:'Review insurance renewal',category:'Finances',priority:'high',dueDate:'2026-11-21'}]},null,2))}</div></div>`}
 function renderGmailConnection(){const id=S.settings.gmailClientId||'',enabled=!!id,active=!!gmailAccessToken&&Date.now()<gmailExpiresAt;
- const last=S.settings.gmailLastScanAt?`Last checked ${esc(new Date(S.settings.gmailLastScanAt).toLocaleString())}`:'No Gmail scan yet';
+ const last=lastCheckedText();
  return `<div class="card" style="border-top:3px solid var(--cyan)"><div class="card-head"><h2>One-tap Gmail review</h2><span class="count">${active?'Connected':enabled?'Setup saved':'Setup needed'}</span></div>
  <p class="subtle">Check Gmail scans the last 7 days in your browser, suggests actionable tasks, and never approves them for you. Basic rules-based triage (not ChatGPT AI). Gmail access is read-only; no email is deleted, changed or sent.</p>
  <div class="btn-row"><button class="btn btn-accent" data-act="check-gmail" ${gmailChecking?'disabled':''}>${gmailChecking?'Checking Gmail…':'✉ Check Gmail'}</button><button class="btn" data-act="gmail-setup">${enabled?'Google setup':'Connect Gmail'}</button>${active?'<button class="btn btn-quiet" data-act="gmail-disconnect">Disconnect</button>':''}</div>
- <div id="gmail-status" class="subtle" aria-live="polite" style="margin-top:12px">${esc(gmailStatus||last)}</div>
+ <div id="gmail-status" class="subtle" aria-live="polite" style="margin-top:12px">${esc(gmailStatus)}</div><p class="last-checked" id="gmail-last-checked">${esc(lastCheckedText())}</p>
  ${gmailMatchPreview.length?`<details style="margin-top:12px"><summary>Already tracked (${gmailMatchPreview.length}) — no duplicate tasks added</summary>${gmailMatchPreview.slice(0,15).map(x=>`<p class="subtle" style="margin:8px 0">✓ ${esc(x.subject)} <span>→ ${esc(x.match)}</span></p>`).join('')}</details>`:''}
  <p class="subtle" style="font-size:12px;margin-top:14px">The JSON import option remains available for deeper ChatGPT-based analysis. A separate Google OAuth client ID is required; ChatGPT's connected Gmail authorization cannot be shared with this website.</p>
  </div>`;
@@ -247,11 +247,18 @@ function existingMatch(proposal){const sid=proposal.sourceMessageId||'';
   return false;
  });
  return match?{reason:'Likely existing task',task:match.title}:null;}
-async function scanGmail(){if(gmailChecking)return;if(!S.settings.gmailClientId){gmailSetup();return}
- gmailChecking=true;gmailMatchPreview=[];updateGmailStatus('Connecting to Google…');render();
+async function scanGmail(opts={}){
+ const auto=opts.auto===true;
+ if(gmailChecking) return 0;
+ if(!S.settings.gmailClientId){ if(!auto) gmailSetup(); return 0; }
+ if(auto&&!gmailTokenReady()) return 0;
+ gmailChecking=true;gmailMatchPreview=[];
+ if(!auto){ updateGmailStatus('Connecting to Google…'); render(); }
+ let added=0;
  try{
-  await authorizeGmail();
-  updateGmailStatus('Finding messages from the last 7 days…');
+  if(!auto) await authorizeGmail();
+  else if(!gmailTokenReady()) throw Error('Gmail session is not active');
+  if(!auto) updateGmailStatus('Finding messages from the last 7 days…');
   const q='newer_than:7d -in:spam -in:trash -category:promotions -category:social';
   let ids=[],pageToken='';
   for(let page=0;page<2;page++){
@@ -261,8 +268,8 @@ async function scanGmail(){if(gmailChecking)return;if(!S.settings.gmailClientId)
   ids=[...new Set(ids)];
   let loaded=0,mails=[],failed=0;
   for(let start=0;start<ids.length;start+=8){const batch=ids.slice(start,start+8);
-   const out=await Promise.all(batch.map(id=>gmailFetch('messages/'+encodeURIComponent(id)+'?format=metadata&metadataHeaders=From&metadataHeaders=Subject&metadataHeaders=Date').then(asGmailItem).catch(e=>{failed++;return null})));
-   mails.push(...out.filter(Boolean));loaded+=batch.length;updateGmailStatus(`Scanning ${loaded}/${ids.length} Gmail messages…`);
+   const out=await Promise.all(batch.map(id=>gmailFetch('messages/'+encodeURIComponent(id)+'?format=metadata&metadataHeaders=From&metadataHeaders=Subject&metadataHeaders=Date').then(asGmailItem).catch(()=>{failed++;return null})));
+   mails.push(...out.filter(Boolean));loaded+=batch.length;if(!auto) updateGmailStatus(`Scanning ${loaded}/${ids.length} Gmail messages…`);
   }
   let proposals=[],matches=[],ignored=0;
   for(const m of mails){const p=classifyGmailMessage(m);if(!p){ignored++;continue}
@@ -270,12 +277,18 @@ async function scanGmail(){if(gmailChecking)return;if(!S.settings.gmailClientId)
    proposals.push(p);
   }
   gmailMatchPreview=matches;
-  const count=proposals.length;importEmailProposals({proposals});
-  S.settings.gmailLastScanAt=new Date().toISOString();S.settings.gmailLastCounts={scanned:mails.length,new:count,matched:matches.length,ignored,failed};
-  save();gmailStatus=`Scanned ${mails.length}: ${count} proposed, ${matches.length} already tracked, ${ignored} informational${failed?`, ${failed} couldn't load`:''}. Review proposals below.`;
-  render();
- }catch(e){console.warn('Gmail connection failed',e);updateGmailStatus(`Gmail access failed: ${e.message}. If Google sign-in can't open in the Home Screen app, open this same URL in Safari.`);}
- finally{gmailChecking=false;render()}
+  const imported=importEmailProposals({proposals},{quiet:auto})||{added:0};
+  added=imported.added||0;
+  S.settings.gmailLastScanAt=new Date().toISOString();
+  S.settings.gmailLastCounts={scanned:mails.length,new:added,matched:matches.length,ignored,failed};
+  save(false);
+  gmailStatus=`Scanned ${mails.length}: ${added} proposed, ${matches.length} already tracked, ${ignored} informational${failed?`, ${failed} couldn't load`:''}. Review proposals below.`;
+  if(!auto) render();
+ }catch(e){
+  console.warn('Gmail connection failed',e);
+  if(!auto) updateGmailStatus(`Gmail access failed: ${e.message}. If Google sign-in can't open in the Home Screen app, open this same URL in Safari.`);
+ }finally{ gmailChecking=false; if(!auto) render(); }
+ return added;
 }
 
 /* v5.4 email triage + orders */
@@ -295,24 +308,38 @@ function parseOrderMessage(m){const subject=headerOf(m,'subject')||'',from=heade
 function upsertOrder(incoming){let o=S.orders.find(o=>incoming.orderNumber&&o.orderNumber===incoming.orderNumber&&o.merchant.toLowerCase()===incoming.merchant.toLowerCase());if(!o&&incoming.trackingNumber)o=S.orders.find(o=>o.trackingNumber&&o.trackingNumber===incoming.trackingNumber);if(!o&&incoming.threadId)o=S.orders.find(o=>o.threadId&&o.threadId===incoming.threadId);if(!o){S.orders.push({id:uid(),...incoming,sourceEmailIds:[incoming.id],archived:false,manualStatus:false,updatedAt:new Date().toISOString()});return 'added'}if(o.sourceEmailIds.includes(incoming.id))return 'seen';o.sourceEmailIds.push(incoming.id);const newer=(incoming.lastEmailDate||'')>=(o.lastEmailDate||'');if(newer){o.lastEmailDate=incoming.lastEmailDate;o.subject=incoming.subject||o.subject;if(!o.manualStatus)o.status=incoming.status||o.status;if(incoming.estimatedDate)o.estimatedDate=incoming.estimatedDate}o.orderNumber=o.orderNumber||incoming.orderNumber;o.trackingNumber=o.trackingNumber||incoming.trackingNumber;o.carrier=o.carrier||incoming.carrier;o.threadId=o.threadId||incoming.threadId;if(o.item.startsWith('Purchase ')&&!incoming.item.startsWith('Purchase '))o.item=incoming.item;o.updatedAt=new Date().toISOString();return 'updated'}
 
 
-async function scanOrders(){if(ordersScanning)return;if(!S.settings.gmailClientId){gmailSetup();return}ordersScanning=true;orderScanStatus='Connecting to Gmail…';render();let added=0,updated=0,seen=0,failed=0;try{
- await authorizeGmail();let ids=[],pageToken='';const q='newer_than:60d {subject:order subject:shipped subject:shipment subject:delivered subject:tracking subject:package subject:return subject:refund} -in:spam -in:trash';
- for(let page=0;page<3;page++){const p=new URLSearchParams({q,maxResults:'100'});if(pageToken)p.set('pageToken',pageToken);const result=await gmailFetch('messages?'+p);ids.push(...(result.messages||[]).map(m=>m.id));pageToken=result.nextPageToken||'';if(!pageToken)break;}
- ids=[...new Set(ids)].slice(0,250);let candidates=[];
- for(let i=0;i<ids.length;i+=8){const batch=await Promise.all(ids.slice(i,i+8).map(id=>gmailFetch('messages/'+encodeURIComponent(id)+'?format=metadata&metadataHeaders=From&metadataHeaders=Subject&metadataHeaders=Date').then(m=>({raw:m,meta:asGmailItem(m)})).catch(()=>{failed++;return null})));candidates.push(...batch.filter(x=>x&&isOrderCandidate(x.meta)));}
- orderScanStatus='Reading '+Math.min(candidates.length,100)+' order emails…';const statusEl=document.getElementById('order-status');if(statusEl)statusEl.textContent=orderScanStatus;
- for(let i=0;i<Math.min(candidates.length,100);i+=6){const results=await Promise.all(candidates.slice(i,i+6).map(x=>gmailFetch('messages/'+encodeURIComponent(x.meta.id)+'?format=full').then(parseOrderMessage).catch(()=>{failed++;return null})));for(const item of results){if(!item)continue;const outcome=upsertOrder(item);if(outcome==='added')added++;else if(outcome==='updated')updated++;else seen++;}}
- S.settings.lastOrderScanAt=new Date().toISOString();S.settings.lastOrderCounts={added,updated,seen,failed};save(false);orderScanStatus='Found '+added+' new orders, '+updated+' updates, '+seen+' already seen'+(failed?', '+failed+' messages unavailable':'')+'.';toast('Orders updated from Gmail');
- }catch(e){console.warn('Order scan failed',e);orderScanStatus='Could not scan orders: '+e.message}
- finally{ordersScanning=false;render()}}
-
-function renderSettings(){const st=totalStats(),trash=S.tasks.filter(t=>t.status==='deleted').sort((a,b)=>(b.deletedAt||'').localeCompare(a.deletedAt||''));return header('MAKE IT YOURS','Settings','Backup, appearance and data protection')+`<div class="card"><div class="card-head"><h2>Appearance</h2></div><div class="field"><label>Accent color</label><div class="theme-dots">${[['cyan','#27d2f3'],['orange','#ff9f58'],['violet','#b29aff'],['green','#4adfa8']].map(([name,c])=>`<button class="theme-dot ${S.settings.accent===name?'selected':''}" style="--c:${c}" data-act="set-accent" data-color="${name}" aria-label="${name}"></button>`).join('')}</div></div><p class="subtle">Category colors are independently editable on the Projects page.</p></div><div class="card"><div class="card-head"><h2>Backup & restore</h2></div><p class="subtle">Data is kept locally in this browser/PWA. Export a JSON backup before replacing an existing deployment or switching browsers/devices.</p><div class="btn-row"><button class="btn btn-accent" data-act="export-backup">↓ Export backup</button><button class="btn" data-act="import-backup">↑ Import backup</button>${oldStorageCandidate?`<button class="btn btn-quiet" data-act="import-legacy">Recover old local data (${oldStorageCandidate.obj.tasks.length} tasks)</button>`:''}</div><div class="divider"></div><div class="subtle">${st.tasks} tasks · ${st.completed} completed · ${S.categories.length} categories · ${S.projects.length} projects · ${S.habits.length} routines · ${S.orders.length} orders</div></div><div class="card"><div class="card-head"><h2>Trash</h2><span class="count">${trash.length}</span></div><p class="subtle">Recover deleted tasks for 30 days. Deleted tasks do not count toward completion or open-task totals.</p>${trash.length?`<div class="btn-row" style="margin-bottom:9px"><button class="btn btn-danger btn-tiny" data-act="empty-trash">Empty trash permanently</button></div>`:''}${trash.slice(0,50).map(t=>`<div class="task-row"><span style="color:var(--red)">✕</span><div><div class="task-title">${esc(t.title)}</div><div class="subtle">Deleted ${esc(fmtDate(t.deletedAt?.slice(0,10)))}</div></div><button class="btn btn-tiny" data-act="restore-task" data-id="${esc(t.id)}">Restore</button></div>`).join('')||'<div class="empty">Trash is empty</div>'}</div><div class="card"><div class="card-head"><h2>Privacy & integrations</h2></div><p class="subtle">Read-only Gmail OAuth runs directly in your browser. Shipping status comes from emails, not live carrier scans. No analytics or Task Forge account is used.</p><button class="btn btn-quiet" data-route="email">Manage email triage</button></div>`}
-function render(){if(!S)return;refreshFocus();const views={home:renderHome,tasks:renderTasks,review:renderReview,projects:renderProjects,routines:renderRoutines,email:renderEmail,settings:renderSettings};$('#main').innerHTML=(views[route]||renderHome)();document.querySelectorAll('.bottom-nav button').forEach(b=>b.classList.toggle('active',b.dataset.route===route));const c=todoReviews().length;const bubble=$('#review-count-bubble');bubble.hidden=!c;bubble.textContent=c>99?'99+':String(c);document.title=`Task Forge · ${route[0].toUpperCase()+route.slice(1)}`;}
+async function scanOrders(opts={}){
+ const auto=opts.auto===true;
+ if(ordersScanning) return 0;
+ if(!S.settings.gmailClientId){ if(!auto) gmailSetup(); return 0; }
+ if(auto&&!gmailTokenReady()) return 0;
+ ordersScanning=true;
+ if(!auto){ orderScanStatus='Connecting to Gmail…'; render(); }
+ let added=0,updated=0,seen=0,failed=0;
+ try{
+  if(!auto) await authorizeGmail();
+  else if(!gmailTokenReady()) throw Error('Gmail session is not active');
+  let ids=[],pageToken='';
+  const q='newer_than:60d {subject:order subject:shipped subject:shipment subject:delivered subject:tracking subject:package subject:return subject:refund} -in:spam -in:trash';
+  for(let page=0;page<3;page++){const p=new URLSearchParams({q,maxResults:'100'});if(pageToken)p.set('pageToken',pageToken);const result=await gmailFetch('messages?'+p);ids.push(...(result.messages||[]).map(m=>m.id));pageToken=result.nextPageToken||'';if(!pageToken)break;}
+  ids=[...new Set(ids)].slice(0,250);let candidates=[];
+  for(let i=0;i<ids.length;i+=8){const batch=await Promise.all(ids.slice(i,i+8).map(id=>gmailFetch('messages/'+encodeURIComponent(id)+'?format=metadata&metadataHeaders=From&metadataHeaders=Subject&metadataHeaders=Date').then(m=>({raw:m,meta:asGmailItem(m)})).catch(()=>{failed++;return null})));candidates.push(...batch.filter(x=>x&&isOrderCandidate(x.meta)));}
+  orderScanStatus='Reading '+Math.min(candidates.length,100)+' order emails…';
+  if(!auto){const statusEl=document.getElementById('order-status');if(statusEl)statusEl.textContent=orderScanStatus;}
+  for(let i=0;i<Math.min(candidates.length,100);i+=6){const results=await Promise.all(candidates.slice(i,i+6).map(x=>gmailFetch('messages/'+encodeURIComponent(x.meta.id)+'?format=full').then(parseOrderMessage).catch(()=>{failed++;return null})));for(const item of results){if(!item)continue;const outcome=upsertOrder(item);if(outcome==='added')added++;else if(outcome==='updated')updated++;else seen++;}}
+  S.settings.lastOrderScanAt=new Date().toISOString();S.settings.lastOrderCounts={added,updated,seen,failed};save(false);
+  orderScanStatus='Found '+added+' new orders, '+updated+' updates, '+seen+' already seen'+(failed?', '+failed+' messages unavailable':'')+'.';
+  if(!auto) toast('Orders updated from Gmail');
+ }catch(e){console.warn('Order scan failed',e);if(!auto) orderScanStatus='Could not scan orders: '+e.message;}
+ finally{ordersScanning=false;if(!auto) render();}
+ return added;
+}
+function renderSettings(){const st=totalStats(),trash=S.tasks.filter(t=>t.status==='deleted').sort((a,b)=>(b.deletedAt||'').localeCompare(a.deletedAt||''));return header('MAKE IT YOURS','Settings',`Backup, appearance and data protection · v${APP_VERSION}`)+`<div class="card"><div class="card-head"><h2>Appearance</h2></div><div class="field"><label>Accent color</label><div class="theme-dots">${[['cyan','#27d2f3'],['orange','#ff9f58'],['violet','#b29aff'],['green','#4adfa8']].map(([name,c])=>`<button class="theme-dot ${S.settings.accent===name?'selected':''}" style="--c:${c}" data-act="set-accent" data-color="${name}" aria-label="${name}"></button>`).join('')}</div></div><p class="subtle">Category colors are independently editable on the Projects page.</p></div><div class="card"><div class="card-head"><h2>Backup & restore</h2></div><p class="subtle">Data stays in this browser. Export a full backup before an update or a new device. Import backup replaces everything. Import into a project merges a task-forge-import file and does not remove existing tasks or notes.</p><div class="btn-row"><button class="btn btn-accent" data-act="export-backup">↓ Export backup</button><button class="btn" data-act="import-backup">↑ Import backup</button><button class="btn" data-act="import-file">Import into a project</button>${oldStorageCandidate?`<button class="btn btn-quiet" data-act="import-legacy">Recover old local data (${oldStorageCandidate.obj.tasks.length} tasks)</button>`:''}</div><div class="divider"></div><div class="subtle">${st.tasks} tasks · ${st.completed} completed · ${S.categories.length} categories · ${S.projects.length} projects · ${S.habits.length} routines · ${S.orders.length} orders</div></div><div class="card"><div class="card-head"><h2>Trash</h2><span class="count">${trash.length}</span></div><p class="subtle">Recover deleted tasks for 30 days. Deleted tasks do not count toward completion or open-task totals.</p>${trash.length?`<div class="btn-row" style="margin-bottom:9px"><button class="btn btn-danger btn-tiny" data-act="empty-trash">Empty trash permanently</button></div>`:''}${trash.slice(0,50).map(t=>`<div class="task-row"><span style="color:var(--red)">✕</span><div><div class="task-title">${esc(t.title)}</div><div class="subtle">Deleted ${esc(fmtDate(t.deletedAt?.slice(0,10)))}</div></div><button class="btn btn-tiny" data-act="restore-task" data-id="${esc(t.id)}">Restore</button></div>`).join('')||'<div class="empty">Trash is empty</div>'}</div><div class="card"><div class="card-head"><h2>Privacy & integrations</h2></div><p class="subtle">Read-only Gmail OAuth runs directly in your browser. Shipping status comes from emails, not live carrier scans. No analytics or Task Forge account is used.</p><label class="setting-row"><input id="auto-gmail-scan" type="checkbox" ${S.settings.autoGmailScan!==false?'checked':''}><span><b>Auto-check Gmail</b><span class="subtle" style="display:block">When a Gmail session is already connected, check for proposals and orders on open, when you come back, and every 15 minutes. This never opens the Google sign-in popup.</span></span></label><div class="btn-row" style="margin-top:12px"><button class="btn btn-quiet" data-route="email">Manage email triage</button></div></div>`}
+function render(){if(!S)return;flushProjectNotes();refreshFocus();const views={home:renderHome,tasks:renderTasks,review:renderReview,projects:renderProjects,routines:renderRoutines,email:renderEmail,settings:renderSettings};$('#main').innerHTML=(views[route]||renderHome)();document.querySelectorAll('.bottom-nav button').forEach(b=>b.classList.toggle('active',b.dataset.route===route));const c=todoReviews().length;const bubble=$('#review-count-bubble');bubble.hidden=!c;bubble.textContent=c>99?'99+':String(c);document.title=`Task Forge v${APP_VERSION} · ${route[0].toUpperCase()+route.slice(1)}`;}
 function showModal(title,body,actions=''){const root=$('#modal-root');root.innerHTML=`<div class="modal-backdrop"><div class="modal-sheet" role="dialog" aria-modal="true" aria-label="${esc(title)}"><div class="modal-top"><h2>${esc(title)}</h2><button data-act="close-modal" aria-label="Close dialog">×</button></div>${body}${actions?`<div class="modal-actions">${actions}</div>`:''}</div></div>`;root.querySelector('.modal-backdrop').addEventListener('click',e=>{if(e.target.classList.contains('modal-backdrop'))closeModal()})}
 function closeModal(){$('#modal-root').innerHTML=''}
 function toast(message,action,fn){const root=$('#toast-root');clearTimeout(toastHandle);root.innerHTML=`<div class="toast"><span>${esc(message)}</span>${action?'<button id="toast-action">'+esc(action)+'</button>':''}</div>`;if(action&&fn)$('#toast-action').addEventListener('click',()=>{root.innerHTML='';fn()});toastHandle=setTimeout(()=>{root.innerHTML=''},8000)}
 // Optional checklist items are saved with their parent task and included in backups.
-function normalizeChecklist(items){return Array.isArray(items)?items.filter(i=>i&&typeof i.text==='string'&&i.text.trim()).map(i=>({id:typeof i.id==='string'&&i.id?i.id:uid(),text:i.text.trim(),done:i.done===true})):[]}
 function checklistProgress(t){const items=normalizeChecklist(t.checklist);return items.length?`<span class="tag checklist-progress">${items.filter(i=>i.done).length} of ${items.length} items</span>`:''}
 function checklistEditorRow(item={id:uid(),text:'',done:false}){return `<div class="checklist-editor-row" data-item-id="${esc(item.id)}"><input class="checklist-done" type="checkbox" aria-label="Item complete" ${item.done?'checked':''}><input class="checklist-text" type="text" aria-label="Checklist item" placeholder="Item name" value="${esc(item.text)}"><button type="button" class="btn" data-act="remove-checklist-item" aria-label="Remove checklist item">×</button></div>`}
 function checklistEditor(items){const list=normalizeChecklist(items);return `<section class="checklist-editor"><button class="btn" type="button" data-act="add-checklist-item" id="add-checklist-item">${list.length?'+ Add item':'+ Add checklist'}</button><div id="checklist-items">${list.map(checklistEditorRow).join('')}</div><p class="subtle" id="checklist-help" ${list.length?'':'hidden'}>Check off items as you go. Tap Save changes to keep your edits.</p></section>`}
@@ -328,18 +355,208 @@ function confirmModal(title,message,yes,action='Confirm'){showModal(title,`<p cl
 function reorder(arr,value,delta){let i=arr.indexOf(value),j=i+delta;if(i<0||j<0||j>=arr.length)return;[arr[i],arr[j]]=[arr[j],arr[i]]}
 function deleteTasks(ids){const changed=[];ids.forEach(id=>{const t=S.tasks.find(x=>x.id===id);if(t&&t.status!=='deleted'){changed.push({id,status:t.status,reviewed:t.reviewed});t.status='deleted';t.deletedAt=new Date().toISOString();t.updatedAt=t.deletedAt}});selected.clear();closeModal();save();if(changed.length)toast(`${changed.length} task${changed.length===1?'':'s'} moved to Trash`,'Undo',()=>{changed.forEach(r=>{const t=S.tasks.find(x=>x.id===r.id);if(t){t.status=r.status;t.reviewed=r.reviewed;t.deletedAt=null}});save()})}
 function keepTasks(ids,complete){ids.forEach(id=>{const t=S.tasks.find(x=>x.id===id);if(t){t.reviewed=true;if(complete){t.status='completed';t.completedAt=new Date().toISOString()}t.updatedAt=new Date().toISOString()}});selected.clear();save();toast(`${ids.length} task${ids.length===1?'':'s'} ${complete?'completed':'kept'}`)}
-function toggleTask(id){let t=S.tasks.find(t=>t.id===id);if(!t)return;t.status=t.status==='completed'?'open':'completed';t.completedAt=t.status==='completed'?new Date().toISOString():null;t.reviewed=true;t.updatedAt=new Date().toISOString();save()}
+function toggleTask(id){
+ let t=S.tasks.find(t=>t.id===id);if(!t)return;
+ const before=focusAllDone();
+ const completing=t.status!=='completed';
+ t.status=completing?'completed':'open';
+ t.completedAt=t.status==='completed'?new Date().toISOString():null;
+ t.reviewed=true;t.updatedAt=new Date().toISOString();
+ if(!before&&focusAllDone()) pendingFocusCelebration=true;
+ if(completing) haptic(pendingFocusCelebration?[12,40,16]:12);
+ save();
+ if(completing) flashCheck(id);
+}
 function purgeExpiredTrash(){const oldCount=S.tasks.length;S.tasks=S.tasks.filter(t=>t.status!=='deleted'||!(t.deletedAt&&Date.now()-new Date(t.deletedAt).getTime()>30*86400000));if(oldCount!==S.tasks.length)save(false)}
 function download(name,txt,type='application/json'){const blob=new Blob([txt],{type}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1200)}
 function startFile(mode){const input=$('#file-input');input.value='';input.dataset.mode=mode;input.click()}
 function importBackup(raw){if(!raw||!Array.isArray(raw.tasks)||!Array.isArray(raw.categories)||!Array.isArray(raw.projects))return alert('This is not a Task Forge backup JSON. Expected tasks, projects and categories.');const next=normalize(raw);confirmModal('Restore backup?',`Replace current dashboard data with ${next.tasks.length} tasks, ${next.projects.length} projects and ${next.categories.length} categories? Export current data first if you need to keep changes.`,()=>{S=next;oldStorageCandidate=null;taskFilter='open';route='home';location.hash='home';save();toast(`Restored ${S.tasks.length} tasks`);window.scrollTo(0,0)},'Replace data')}
-function importEmailProposals(raw){let arr=Array.isArray(raw)?raw:(Array.isArray(raw?.proposals)?raw.proposals:null);if(!arr)return alert('Email import requires a JSON object with a proposals array, or an array of proposals.');let added=0,duplicates=0;arr.forEach(p=>{if(!p||typeof p!=='object')return;const sid=String(p.sourceMessageId||p.gmailId||p.messageId||'');const subject=String(p.subject||p.taskTitle||'Untitled message');if(sid&&S.emailProposals.some(x=>x.sourceMessageId===sid)){duplicates++;return}if(!sid&&S.emailProposals.some(x=>x.subject===subject&&x.from===(p.from||'')&&x.status!=='rejected')){duplicates++;return}S.emailProposals.push({id:uid(),sourceMessageId:sid,subject,from:String(p.from||''),date:String(p.date||''),summary:String(p.summary||p.snippet||''),taskTitle:String(p.taskTitle||p.action||subject),category:S.categories.some(c=>c.name===p.category)?p.category:'Email',priority:['low','normal','high','urgent'].includes(p.priority)?p.priority:'normal',dueDate:/^\d{4}-\d{2}-\d{2}$/.test(p.dueDate||'')?p.dueDate:'',status:'pending',importedAt:new Date().toISOString()});added++});save();toast(`${added} email proposal${added===1?'':'s'} imported${duplicates?`; ${duplicates} duplicate(s) skipped`:''}`)}
+function importEmailProposals(raw,opts={}){let arr=Array.isArray(raw)?raw:(Array.isArray(raw?.proposals)?raw.proposals:null);if(!arr)return alert('Email import requires a JSON object with a proposals array, or an array of proposals.');let added=0,duplicates=0;arr.forEach(p=>{if(!p||typeof p!=='object')return;const sid=String(p.sourceMessageId||p.gmailId||p.messageId||'');const subject=String(p.subject||p.taskTitle||'Untitled message');if(sid&&S.emailProposals.some(x=>x.sourceMessageId===sid)){duplicates++;return}if(!sid&&S.emailProposals.some(x=>x.subject===subject&&x.from===(p.from||'')&&x.status!=='rejected')){duplicates++;return}S.emailProposals.push({id:uid(),sourceMessageId:sid,subject,from:String(p.from||''),date:String(p.date||''),summary:String(p.summary||p.snippet||''),taskTitle:String(p.taskTitle||p.action||subject),category:S.categories.some(c=>c.name===p.category)?p.category:'Email',priority:['low','normal','high','urgent'].includes(p.priority)?p.priority:'normal',dueDate:/^\d{4}-\d{2}-\d{2}$/.test(p.dueDate||'')?p.dueDate:'',status:'pending',importedAt:new Date().toISOString()});added++});if(opts.quiet)save(false);else{save();toast(`${added} email proposal${added===1?'':'s'} imported${duplicates?`; ${duplicates} duplicate(s) skipped`:''}`);}return {added,duplicates}}
 function saveRoutineFromForm(form){const values=new FormData(form),id=form.dataset.id,h=S.habits.find(x=>x.id===id)||null,frequency=String(values.get('frequency')||'daily'),weekdays=values.getAll('weekday').map(Number);if(['weekdays','weekly','biweekly'].includes(frequency)&&!weekdays.length){alert('Select at least one day for this recurrence.');return}let sched={frequency,weekdays,monthDay:Math.max(1,Math.min(28,num(values.get('monthDay'))||1)),anchorDate:String(values.get('anchorDate')||iso())};if(h){h.name=String(values.get('name')||'').trim();h.target=Math.max(1,Math.min(7,num(values.get('target'))||1));h.schedule=sched}else{S.habits.push({id:uid(),name:String(values.get('name')||'').trim(),target:Math.max(1,Math.min(7,num(values.get('target'))||1)),type:'habit',schedule:sched})}closeModal();save();toast('Routine saved')}
 function saveCategoryFromForm(form){let name=String(new FormData(form).get('name')||'').trim(),original=form.dataset.original,color=cleanColor($('#category-color').value);if(!name)return;if(S.categories.some(c=>c.name.toLowerCase()===name.toLowerCase()&&c.name!==original))return alert('That category already exists');if(original){let c=S.categories.find(c=>c.name===original);if(!c)return;c.name=name;c.color=color;c.colorEditedV5=true;const idx=S.categoryOrder.indexOf(original);if(idx>=0)S.categoryOrder[idx]=name;S.tasks.forEach(t=>{if(t.category===original)t.category=name});S.projects.forEach(p=>{if(p.category===original)p.category=name});S.emailProposals.forEach(p=>{if(p.category===original)p.category=name})}else{S.categories.push({name,color,icon:'grid',visible:true,colorBeforeV5:color});S.categoryOrder.push(name)}closeModal();save();toast('Category saved')}
 function saveProjectFromForm(form){let name=String(new FormData(form).get('name')||'').trim(),category=String(new FormData(form).get('category')||''),id=form.dataset.id;if(!name)return;if(id){const p=S.projects.find(x=>x.id===id);if(p){p.name=name;p.category=category}}else{const idNew=uid();S.projects.push({id:idNew,name,category});S.projectOrder.push(idNew)}closeModal();save();toast('Project saved')}
 function saveTaskFromForm(form){refreshFocus();const vals=new FormData(form),id=form.dataset.id,t=S.tasks.find(x=>x.id===id);let category=String(vals.get('category')||'Inbox'),projectId=String(vals.get('projectId')||'');if(projectId&&!S.projects.some(p=>p.id===projectId&&p.category===category))projectId=null;const props={title:String(vals.get('title')||'').trim(),category,projectId,priority:String(vals.get('priority')||'normal'),dueDate:String(vals.get('dueDate')||'')||null,notes:String(vals.get('notes')||'').trim(),checklist:readChecklist(form),updatedAt:new Date().toISOString()};if(!props.title)return;const doToday=vals.has('doToday');if(doToday&&!S.focus.ids.includes(id)&&S.focus.ids.length>=FOCUS_LIMIT){toast('Today already has 5 tasks. Remove one or uncheck Do today.');return}const savedId=t?.id||uid();if(t)Object.assign(t,props);else S.tasks.unshift({id:savedId,...props,status:'open',reviewed:true,source:'Manual',parentId:null,indent:0,sourceIndex:0,possibleDuplicate:false,completedAt:null});if(doToday){if(!S.focus.ids.includes(savedId))S.focus.ids.push(savedId);S.focus.carryoverIds=S.focus.carryoverIds.filter(x=>x!==savedId)}else if(!t||t.status==='open'){S.focus.ids=S.focus.ids.filter(x=>x!==savedId)}closeModal();save();toast(t?'Task saved':'Task added')}
 function saveEmailFromForm(form){const v=new FormData(form),id=form.dataset.id,p=S.emailProposals.find(x=>x.id===id),data={subject:String(v.get('subject')||'').trim(),from:String(v.get('from')||'').trim(),taskTitle:String(v.get('taskTitle')||'').trim(),summary:String(v.get('summary')||'').trim(),category:String(v.get('category')||'Email'),priority:String(v.get('priority')||'normal'),dueDate:String(v.get('dueDate')||'')};if(!data.subject||!data.taskTitle)return;if(p)Object.assign(p,data);else S.emailProposals.push({id:uid(),...data,status:'pending',sourceMessageId:'',date:iso(),importedAt:new Date().toISOString()});closeModal();save();toast('Email proposal saved')}
 function approveEmail(id){const p=S.emailProposals.find(x=>x.id===id);if(!p||p.status!=='pending')return;if(p.sourceMessageId&&S.tasks.some(t=>t.sourceMessageId===p.sourceMessageId&&t.status!=='deleted')){p.status='approved';save();toast('This email already has an approved task');return}S.tasks.unshift({id:uid(),title:p.taskTitle||p.subject,notes:`From: ${p.from||'Gmail'}\nSubject: ${p.subject||''}\n${p.summary||''}`,category:p.category||'Email',projectId:null,priority:p.priority||'normal',status:'open',reviewed:true,dueDate:p.dueDate||null,source:'Gmail proposal',sourceMessageId:p.sourceMessageId||null,parentId:null,indent:0,completedAt:null,updatedAt:new Date().toISOString()});p.status='approved';p.approvedAt=new Date().toISOString();save();toast('Email approved and added to Tasks')}
+function garminRing(done,total){
+ const pct=total?Math.max(0,Math.min(100,Math.round(done/total*100))):0;
+ const full=total>0&&done===total;
+ return `<div class="garmin-ring${full?' is-full':''}" style="--pct:${pct}" role="img" aria-label="${done} of ${total||0} focus tasks complete"><strong>${done}<span>/${total||0}</span></strong></div>`;
+}
+function miniRing(pct,color){
+ const n=Math.max(0,Math.min(100,Math.round(Number(pct)||0)));
+ return `<span class="mini-ring" style="--pct:${n};--ring:${cleanColor(color)}" aria-hidden="true"><b>${n}</b></span>`;
+}
+function lastCheckedText(){
+ if(gmailChecking||ordersScanning||autoScanRunning) return 'Checking Gmail…';
+ const stamps=[S?.settings?.gmailLastScanAt,S?.settings?.lastOrderScanAt].filter(Boolean);
+ if(!stamps.length) return 'Last checked — not yet';
+ const ms=Date.now()-Math.max(...stamps.map(s=>new Date(s).getTime()));
+ if(!Number.isFinite(ms)||ms<45000) return 'Last checked just now';
+ const min=Math.floor(ms/60000);
+ if(min<60) return `Last checked ${min} min ago`;
+ const hr=Math.floor(min/60);
+ if(hr<48) return `Last checked ${hr} hr ago`;
+ return `Last checked ${Math.floor(hr/24)} days ago`;
+}
+function updateLastChecked(){
+ const text=S?lastCheckedText():'';
+ document.querySelectorAll('#last-checked,#gmail-last-checked').forEach(el=>{el.textContent=text});
+}
+function prefersReducedMotion(){return !!(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches)}
+function haptic(pattern){if(prefersReducedMotion())return;try{navigator.vibrate?.(pattern)}catch(e){}}
+function canQuietlyRefresh(){
+ const a=document.activeElement;if(!a)return true;
+ return !['INPUT','TEXTAREA','SELECT'].includes(a.tagName);
+}
+function gmailTokenReady(){return !!(S?.settings?.gmailClientId&&gmailAccessToken&&Date.now()<gmailExpiresAt-60000)}
+function focusAllDone(){
+ if(!S?.focus) return false;
+ const tasks=S.focus.ids.map(id=>S.tasks.find(t=>t.id===id)).filter(t=>t&&t.status!=='deleted');
+ return tasks.length>0&&tasks.every(t=>t.status==='completed');
+}
+function flashCheck(id){
+ const safe=window.CSS?.escape?CSS.escape(id):(String(id).match(/^[\w-]+$/)?id:'');
+ if(!safe) return;
+ requestAnimationFrame(()=>{document.querySelectorAll(`[data-act="toggle-task"][data-id="${safe}"]`).forEach(el=>{el.classList.add('just-checked');el.closest('.task-row,.focus-row')?.classList.add('just-done')})});
+}
+async function autoScanIfReady(trigger){
+ if(!S||S.settings.autoGmailScan===false) return;
+ if(!gmailTokenReady()) return;
+ if(autoScanRunning||gmailChecking||ordersScanning) return;
+ const now=Date.now();
+ if(trigger!=='interval'&&now-lastAutoAttempt<20000) return;
+ if(trigger==='interval'&&now-lastAutoAttempt<14*60*1000) return;
+ lastAutoAttempt=now;autoScanRunning=true;updateLastChecked();
+ let proposals=0,orders=0;
+ try{proposals=await scanGmail({auto:true});orders=await scanOrders({auto:true})}
+ catch(e){console.warn('Auto scan failed',e)}
+ finally{autoScanRunning=false;updateLastChecked();if(canQuietlyRefresh())render()}
+ if(proposals||orders){
+  const bits=[];
+  if(proposals) bits.push(`${proposals} email proposal${proposals===1?'':'s'}`);
+  if(orders) bits.push(`${orders} order${orders===1?'':'s'}`);
+  toast(`Gmail found ${bits.join(' and ')}`);
+ }
+}
+function noteDateLabel(s){if(!s)return 'No date';const d=parseDate(s);return d?d.toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'}):'No date'}
+function sortedNoteEntries(entries){
+ return [...(entries||[])].sort((a,b)=>{
+  if(!a.date&&!b.date) return 0;
+  if(!a.date) return 1;
+  if(!b.date) return -1;
+  return a.date<b.date?1:-1;
+ });
+}
+function renderNoteEntry(projectId,e){
+ return `<article class="note-entry"><div class="note-entry-top"><div class="note-entry-copy"><div class="note-date">${esc(noteDateLabel(e.date))}</div>${e.title?`<div class="note-title">${esc(e.title)}</div>`:''}</div><div class="actions"><button class="btn btn-tiny" data-act="edit-note" data-id="${esc(e.id)}" data-project="${esc(projectId)}">Edit</button><button class="btn btn-tiny" data-act="delete-note" data-id="${esc(e.id)}" data-project="${esc(projectId)}">Delete</button></div></div>${e.body?`<p class="note-body">${esc(e.body)}</p>`:''}</article>`;
+}
+function renderProjectNotes(p){
+ const notes=p.notes||{text:'',entries:[]};
+ const entries=sortedNoteEntries(notes.entries);
+ return `<section class="card notes-card" aria-labelledby="project-notes-heading"><div class="card-head"><div><h2 id="project-notes-heading">Notes</h2><p class="subtle">Reference and a dated log, kept apart from this project’s tasks. Included in backups.</p></div><button class="btn btn-tiny btn-accent" data-act="add-note" data-id="${esc(p.id)}">+ Log entry</button></div><div class="field"><label for="project-notes-text">Reference</label><textarea id="project-notes-text" data-project="${esc(p.id)}" maxlength="50000" placeholder="Specs, part numbers, tire sizes, account numbers…">${esc(notes.text||'')}</textarea><div class="subtle" id="project-notes-status" aria-live="polite"></div></div><h3 class="small-heading">Log</h3>${entries.length?entries.map(e=>renderNoteEntry(p.id,e)).join(''):'<div class="empty">No log entries yet. Add service dates, part numbers, or anything you want to find later.</div>'}</section>`;
+}
+function flushProjectNotes(){
+ const el=document.querySelector('#project-notes-text');
+ if(!el||!S) return;
+ clearTimeout(notesTimer);
+ const p=S.projects.find(x=>x.id===el.dataset.project);
+ if(!p) return;
+ const text=String(el.value||'').slice(0,50000);
+ if(!p.notes||typeof p.notes!=='object') p.notes={text:'',entries:[]};
+ if((p.notes.text||'')===text) return;
+ p.notes.text=text;
+ save(false);
+ const mark=document.querySelector('#project-notes-status');
+ if(mark) mark.textContent='Saved';
+}
+function scheduleProjectNotesSave(){
+ clearTimeout(notesTimer);
+ const mark=document.querySelector('#project-notes-status');
+ if(mark) mark.textContent='Saving…';
+ notesTimer=setTimeout(flushProjectNotes,450);
+}
+function noteForm(projectId,entry){
+ flushProjectNotes();
+ const e=entry||{id:'',date:iso(),title:'',body:''};
+ showModal(entry?'Edit log entry':'Add log entry',`<form id="note-form"><div class="field"><label for="note-date">Date</label><input id="note-date" name="date" type="date" value="${esc(e.date||'')}"></div><p class="subtle">Leave the date blank for an undated note.</p><div class="field"><label for="note-title">Title</label><input id="note-title" name="title" maxlength="200" value="${esc(e.title||'')}" placeholder="Optional — oil change, tire size…"></div><div class="field"><label for="note-body">Note</label><textarea id="note-body" name="body" maxlength="20000" placeholder="What you want to remember">${esc(e.body||'')}</textarea></div><div class="modal-actions">${entry?`<button type="button" class="btn btn-danger" data-act="delete-note" data-id="${esc(e.id)}" data-project="${esc(projectId)}">Delete</button>`:''}<button type="button" class="btn" data-act="close-modal">Cancel</button><button class="btn btn-accent" type="submit">Save note</button></div></form>`);
+ const form=$('#note-form');form.dataset.project=projectId;form.dataset.id=e.id||'';
+ (entry?$('#note-body'):$('#note-title'))?.focus();
+}
+function saveNoteFromForm(form){
+ const projectId=form.dataset.project,id=form.dataset.id,p=S.projects.find(x=>x.id===projectId);
+ if(!p) return;
+ const v=new FormData(form);
+ const dateRaw=String(v.get('date')||'').trim();
+ const title=String(v.get('title')||'').trim().slice(0,200);
+ const body=String(v.get('body')||'').replace(/\r\n/g,'\n').trim().slice(0,20000);
+ if(!title&&!body){alert('Add a title or some text.');return}
+ if(dateRaw&&!/^\d{4}-\d{2}-\d{2}$/.test(dateRaw)){alert('Use a valid date or leave it blank.');return}
+ p.notes=TF.normalizeProjectNotes(p.notes);
+ if(id){const entry=p.notes.entries.find(e=>e.id===id);if(!entry)return;entry.date=dateRaw||null;entry.title=title;entry.body=body}
+ else p.notes.entries.push({id:uid(),date:dateRaw||null,title,body});
+ closeModal();save();toast('Note saved');
+}
+function deleteProjectNote(projectId,noteId){
+ const p=S.projects.find(x=>x.id===projectId);
+ if(!p?.notes?.entries) return;
+ const idx=p.notes.entries.findIndex(e=>e.id===noteId);
+ if(idx<0) return;
+ const [removed]=p.notes.entries.splice(idx,1);
+ closeModal();save();
+ toast('Note deleted','Undo',()=>{p.notes.entries.splice(idx,0,removed);save()});
+}
+function importTaskList(items){
+ if(!items.length) return '<p class="subtle">None</p>';
+ return `<ul class="import-list">${items.map(t=>`<li><span>${esc(t.title)}</span>${t.completed?'<em>Done</em>':''}${t.priority&&t.priority!=='normal'?`<em>${esc(t.priority)}</em>`:''}</li>`).join('')}</ul>`;
+}
+function importNoteList(items){
+ if(!items.length) return '<p class="subtle">None</p>';
+ return `<ul class="import-list">${items.map(n=>`<li class="import-note"><span>${n.date?esc(n.date):'No date'}${n.title?` · ${esc(n.title)}`:''}</span><small>${esc((n.body||'').slice(0,180))}</small></li>`).join('')}</ul>`;
+}
+function openImportPreview(raw){
+ try{importFile=TF.parseImportFile(raw)}catch(e){alert(e.message||'Could not read that import file.');return}
+ const preset=mergeTargetPreset;mergeTargetPreset='';
+ if(preset&&S.projects.some(p=>p.id===preset)) importProjectChoice=preset;
+ else {
+  const wanted=importFile.project.name.trim().toLowerCase();
+  const cat=importFile.project.category.trim().toLowerCase();
+  const matches=S.projects.filter(p=>p.name.trim().toLowerCase()===wanted&&(!cat||p.category.trim().toLowerCase()===cat));
+  importProjectChoice=matches.length===1?matches[0].id:'__new__';
+ }
+ showImportModal();
+}
+function showImportModal(){
+ if(!importFile) return;
+ const isNew=importProjectChoice==='__new__';
+ let plan;
+ try{plan=TF.previewImportMerge(S,importFile,{projectId:isNew?null:importProjectChoice})}
+ catch(e){showModal('Import into a project',`<p>${esc(e.message)}</p><div class="modal-actions"><button class="btn" data-act="close-modal">Close</button></div>`);return}
+ const options=[`<option value="__new__" ${isNew?'selected':''}>New project${importFile.project.name?`: ${esc(importFile.project.name)}`:''}</option>`].concat(orderedProjects().map(p=>`<option value="${esc(p.id)}" ${importProjectChoice===p.id?'selected':''}>${esc(p.name)} · ${esc(p.category)}</option>`)).join('');
+ const catBlock=isNew?`<div class="field"><label>Category</label><p class="subtle">${plan.categoryName?(plan.categoryExists?`${esc(plan.categoryName)} already exists and will be used.`:`${esc(plan.categoryName)} is not a category yet.`):'This file does not name a category.'}</p>${plan.categoryName&&!plan.categoryExists?`<label class="focus-form-choice"><input id="import-create-cat" type="checkbox" checked> Create category ${esc(plan.categoryName)}</label>`:''}<label for="import-cat-override">Or use an existing category</label><select id="import-cat-override"><option value="">${plan.categoryExists?`Use ${esc(plan.categoryName)}`:'Choose…'}</option>${orderedCategories().map(c=>`<option value="${esc(c.name)}">${esc(c.name)}</option>`).join('')}</select></div>`:`<p class="subtle">Tasks keep this project’s category, ${esc(plan.categoryName)}.</p>`;
+ const actionable=plan.fresh.length+plan.noteNew.length+(plan.descriptionAttach?1:0);
+ const blocked=isNew&&!importFile.project.name;
+ showModal('Import into a project',`<p class="subtle">Adds to one project. Nothing already in Task Forge is deleted or replaced. Duplicates match the title inside that project, ignoring case.</p><div class="field"><label for="import-project">Destination</label><select id="import-project">${options}</select></div>${catBlock}<div class="import-summary"><div><b>${plan.fresh.length}</b><small>New tasks</small></div><div><b>${plan.dupes.length}</b><small>Skip duplicates</small></div><div><b>${plan.noteNew.length}</b><small>Notes</small></div></div>${plan.descriptionAttach?`<p class="subtle">Reference text to add: ${esc(importFile.project.description)}</p>`:''}${plan.skippedBlank?`<p class="subtle">${plan.skippedBlank} blank entr${plan.skippedBlank===1?'y':'ies'} ignored.</p>`:''}<h3 class="small-heading">New tasks</h3>${importTaskList(plan.fresh)}<h3 class="small-heading">Duplicates to skip</h3>${importTaskList(plan.dupes)}<h3 class="small-heading">Notes to attach</h3>${importNoteList(plan.noteNew)}${plan.noteDup.length?`<p class="subtle">${plan.noteDup.length} matching note${plan.noteDup.length===1?'':'s'} already on this project.</p>`:''}<div class="modal-actions"><button class="btn" data-act="close-modal">Cancel</button><button class="btn btn-accent" data-act="commit-import" ${actionable&&!blocked?'':'disabled'}>${actionable&&!blocked?'Import':'Nothing new'}</button></div>`);
+}
+function commitImportMerge(){
+ if(!importFile) return;
+ const isNew=importProjectChoice==='__new__';
+ const categoryOverride=$('#import-cat-override')?.value||'';
+ const createCategory=$('#import-create-cat')?$('#import-create-cat').checked:true;
+ let result;
+ try{result=TF.applyImportMerge(S,importFile,{projectId:isNew?null:importProjectChoice,createCategory,categoryOverride:categoryOverride||null})}
+ catch(e){alert(e.message);return}
+ importFile=null;closeModal();
+ S=result.state;route='projects';projectView=result.projectId;
+ if(location.hash!=='#projects') location.hash='projects';
+ save();
+ const parts=[];
+ if(result.addedTasks) parts.push(`${result.addedTasks} task${result.addedTasks===1?'':'s'}`);
+ if(result.addedNotes) parts.push(`${result.addedNotes} note${result.addedNotes===1?'':'s'}`);
+ const skipped=result.skippedTasks?` · ${result.skippedTasks} duplicate${result.skippedTasks===1?'':'s'} skipped`:'';
+ toast(parts.length?`Imported ${parts.join(' and ')}${skipped}`:'Nothing new to import');
+}
+
 function runClick(act,el){const id=el.dataset.id;switch(act){
  case 'focus-edit':editingFocus=!editingFocus;render();break;
  case 'focus-picker':openFocusPicker();break;
@@ -397,20 +614,28 @@ function runClick(act,el){const id=el.dataset.id;switch(act){
  case 'copy-email-prompt':{const str='Review my connected Gmail inbox for emails that require action. Do not create tasks yet. Return a downloadable JSON file named task-forge-email-proposals.json with {"type":"task-forge-email-proposals","version":1,"proposals":[{"sourceMessageId":"Gmail message ID","subject":"...","from":"...","date":"YYYY-MM-DD","summary":"short action context","taskTitle":"action-oriented title","category":"Email","priority":"normal","dueDate":"YYYY-MM-DD or blank"}]}. Only include actionable messages, do not invent dates, and exclude duplicates and promotional mail. I will import and approve them in Task Forge.';if(navigator.clipboard?.writeText)navigator.clipboard.writeText(str).then(()=>toast('Gmail triage prompt copied')).catch(()=>showModal('Copy this prompt',`<textarea style="width:100%;height:250px">${esc(str)}</textarea>`));else showModal('Copy this prompt',`<textarea style="width:100%;height:250px">${esc(str)}</textarea>`);break}
  case 'import-email':startFile('email');break;
  case 'import-backup':startFile('backup');break;
- case 'export-backup':{const d={...S,exportedAt:new Date().toISOString()};download(`task-forge-v5.4-backup-${iso()}.json`,JSON.stringify(d,null,2));toast('Backup downloaded');break}
+ case 'export-backup':{const d={...S,exportedAt:new Date().toISOString()};download(`task-forge-v${APP_VERSION}-backup-${iso()}.json`,JSON.stringify(d,null,2));toast('Backup downloaded');break}
  case 'import-legacy':if(oldStorageCandidate)importBackup(oldStorageCandidate.obj);break;
  case 'restore-task':{const t=S.tasks.find(t=>t.id===id);if(t){t.status=t.completedAt?'completed':'open';t.deletedAt=null;t.updatedAt=new Date().toISOString();save();toast('Task restored')}break}
  case 'empty-trash':confirmModal('Empty Trash?',`Permanently remove ${S.tasks.filter(t=>t.status==='deleted').length} deleted tasks? This cannot be undone.`,()=>{S.tasks=S.tasks.filter(t=>t.status!=='deleted');save();toast('Trash emptied')},'Delete permanently');break;
  case 'set-accent':S.settings.accent=el.dataset.color;setAccent(S.settings.accent);save();break;
  case 'delete-category':confirmModal('Delete category?',`Delete ${id} and move its tasks and projects into Inbox?`,()=>{if(!S.categories.some(c=>c.name==='Inbox')&&id!=='Inbox'){S.categories.push({name:'Inbox',color:'#74cedf',icon:'inbox',visible:true})}const fallback=S.categories.find(c=>c.name!==id)?.name||'Inbox';S.tasks.forEach(t=>{if(t.category===id)t.category=fallback});S.projects.forEach(p=>{if(p.category===id)p.category=fallback});S.emailProposals.forEach(p=>{if(p.category===id)p.category=fallback});S.categories=S.categories.filter(c=>c.name!==id);S.categoryOrder=S.categoryOrder.filter(c=>c!==id);save()},'Delete category');break;
- case 'delete-project':confirmModal('Delete project?',`Remove ${categoryName(id)}? Its tasks stay in their categories but lose project assignment.`,()=>{S.projects=S.projects.filter(p=>p.id!==id);S.tasks.forEach(t=>{if(t.projectId===id)t.projectId=null});S.projectOrder=S.projectOrder.filter(x=>x!==id);projectView='';save()},'Delete project');break;
+ case 'delete-project':confirmModal('Delete project?',`Remove ${categoryName(id)}? Its tasks stay in their categories, but the project and its notes are removed.`,()=>{S.projects=S.projects.filter(p=>p.id!==id);S.tasks.forEach(t=>{if(t.projectId===id)t.projectId=null});S.projectOrder=S.projectOrder.filter(x=>x!==id);projectView='';save()},'Delete project');break;
  case 'delete-routine':confirmModal('Delete routine?',`Remove this routine? Existing check-in history will remain in backups.`,()=>{S.habits=S.habits.filter(h=>h.id!==id);save()},'Delete routine');break;
+ case 'add-note':noteForm(id);break;
+ case 'edit-note':{const p=S.projects.find(x=>x.id===el.dataset.project);const entry=p?.notes?.entries?.find(n=>n.id===id);if(entry)noteForm(p.id,entry);break}
+ case 'delete-note':deleteProjectNote(el.dataset.project,id);break;
+ case 'import-file':mergeTargetPreset='';startFile('merge');break;
+ case 'import-project':mergeTargetPreset=id;startFile('merge');break;
+ case 'commit-import':commitImportMerge();break;
  case 'close-modal':closeModal();break;
  }}
 function bindEvents(){
  $('#brand-home').addEventListener('click',()=>navigate('home'));$('#new-task-btn').addEventListener('click',()=>taskForm());
  document.addEventListener('click',e=>{let routeBtn=e.target.closest('[data-route]');if(routeBtn){navigate(routeBtn.dataset.route);return}let b=e.target.closest('[data-act]');if(b){e.preventDefault();runClick(b.dataset.act,b)}});
  document.addEventListener('change',e=>{const t=e.target;
+ if(t.id==='import-project'){importProjectChoice=t.value;showImportModal();return}
+ if(t.id==='auto-gmail-scan'){S.settings.autoGmailScan=t.checked;save(false);return}
  if(t.id==='routine-frequency'){updateRoutineFormVisibility();return}
  if(t.id==='form-task-category'){const sel=$('#form-task-project');if(sel)sel.innerHTML=projectOptions('',t.value);return}
  if(t.id==='task-category'){taskCategory=t.value;taskCount=40;render();return}
@@ -418,11 +643,11 @@ function bindEvents(){
  if(t.dataset.act==='select-review'){if(t.checked)selected.add(t.dataset.id);else selected.delete(t.dataset.id);render();return}
  if(t.dataset.field){const task=S.tasks.find(x=>x.id===t.dataset.id);if(!task)return;task[t.dataset.field]=t.value||null;if(t.dataset.field==='category'){task.projectId=null;}task.updatedAt=new Date().toISOString();save();return}
  if(t.dataset.emailField){const p=S.emailProposals.find(x=>x.id===t.dataset.id);if(!p)return;p[t.dataset.emailField]=t.value||null;save();return}
- if(t.id==='file-input'){const f=t.files?.[0];if(!f)return;const mode=t.dataset.mode;f.text().then(text=>{let obj;try{obj=JSON.parse(text)}catch{alert('This is not a valid JSON file. Check that you selected the actual .json export, not a .txt description.');return}if(mode==='email')importEmailProposals(obj);else importBackup(obj)});return}
+ if(t.id==='file-input'){const f=t.files?.[0];if(!f)return;if(f.size>10*1024*1024){alert('That file is over the 10 MB import limit.');return}const mode=t.dataset.mode;f.text().then(text=>{let obj;try{obj=JSON.parse(text)}catch{alert('This is not a valid JSON file. Check that you selected the actual .json export, not a .txt description.');return}if(mode==='email')importEmailProposals(obj);else if(mode==='merge'||obj?.format==='task-forge-import'){if(obj?.format!=='task-forge-import'){alert('Choose a task-forge-import JSON file. Full backups use Import backup.');return}openImportPreview(obj)}else importBackup(obj)});return}
  });
- document.addEventListener('input',e=>{if(e.target.id==='focus-search'){focusPickerQuery=e.target.value;renderFocusPickerResults();return}if(e.target.id==='task-search'){taskQuery=e.target.value;const start=e.target.selectionStart;render();const next=$('#task-search');next?.focus();try{next.setSelectionRange(start,start)}catch{}}});
- document.addEventListener('submit',e=>{const form=e.target;if(!['task-form','category-form','project-form','routine-form','email-form','gmail-setup-form'].includes(form.id))return;e.preventDefault();if(form.id==='task-form')saveTaskFromForm(form);if(form.id==='category-form')saveCategoryFromForm(form);if(form.id==='project-form')saveProjectFromForm(form);if(form.id==='routine-form')saveRoutineFromForm(form);if(form.id==='email-form')saveEmailFromForm(form);if(form.id==='gmail-setup-form')saveGmailSetup(form)});
+ document.addEventListener('input',e=>{if(e.target.id==='project-notes-text'){scheduleProjectNotesSave();return}if(e.target.id==='focus-search'){focusPickerQuery=e.target.value;renderFocusPickerResults();return}if(e.target.id==='task-search'){taskQuery=e.target.value;const start=e.target.selectionStart;render();const next=$('#task-search');next?.focus();try{next.setSelectionRange(start,start)}catch{}}});
+ document.addEventListener('submit',e=>{const form=e.target;if(!['task-form','category-form','project-form','routine-form','email-form','gmail-setup-form','note-form'].includes(form.id))return;e.preventDefault();if(form.id==='note-form')return saveNoteFromForm(form);if(form.id==='task-form')saveTaskFromForm(form);if(form.id==='category-form')saveCategoryFromForm(form);if(form.id==='project-form')saveProjectFromForm(form);if(form.id==='routine-form')saveRoutineFromForm(form);if(form.id==='email-form')saveEmailFromForm(form);if(form.id==='gmail-setup-form')saveGmailSetup(form)});
  document.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.matches('.checklist-text')){e.preventDefault();addChecklistItem()}if(e.key==='Escape')closeModal()});
  window.addEventListener('hashchange',()=>{const next=location.hash.slice(1).split('/')[0];if(next&&next!==route){route=next;projectView='';render()}});
 }
-initialize().then(()=>{if(S){purgeExpiredTrash();render();setInterval(()=>{if(!document.hidden&&S.focus.date!==iso())render()},60000)}}).catch(e=>{console.error(e);$('#main').innerHTML='<div class="card"><h2>Unable to load dashboard</h2><p>Open browser developer tools for details. Your existing backup was not changed.</p></div>'});
+initialize().then(()=>{if(S){purgeExpiredTrash();render();autoScanIfReady('open');setInterval(()=>{if(document.hidden||!S)return;if(S.focus.date!==iso())render();else updateLastChecked()},60000);setInterval(()=>{if(!document.hidden)autoScanIfReady('interval')},15*60*1000)}}).catch(e=>{console.error(e);$('#main').innerHTML='<div class="card"><h2>Unable to load dashboard</h2><p>Open browser developer tools for details. Your existing backup was not changed.</p></div>'});

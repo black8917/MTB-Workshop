@@ -1,27 +1,57 @@
-# Task Forge v5.4.1 — Today’s Focus
+# Task Forge v5.5
 
-Updated in place at `/MTB-Workshop/task-forge-v5-4/` so installed shortcuts and the existing `task-forge-v5.4-state` data remain in use.
+Shipped in place at `/MTB-Workshop/task-forge-v5-4/` so the iPhone Home Screen icon keeps working. The storage key is still `task-forge-v5.4-state`. A v5.3 or v5.2 browser that has not been saved under that key is copied into it and written immediately.
 
-## Today’s Focus
-- Home opens with a user-selected daily list. Start with three tasks; at most five including completed selections.
-- Choose tasks offers suggestions by deadline/priority and search across all open tasks. Nothing is automatically selected.
-- Do today is available on task rows and in the new/edit task form. It never changes a task’s due date or creates a duplicate.
-- Edit list exposes touch-friendly move up/down and remove controls. Removing only changes the daily selection.
-- Completing a task updates its existing record. Completed selections collapse and remain in the progress denominator; the list does not refill automatically.
-- At the next local calendar day, unfinished selections become a review queue. Keep today or Later; Later leaves the task in All tasks.
-- The daily selection and pending carryover are included in JSON backup export/restore. Older backups load with an empty selection.
-- Dashboard totals now fit into one compact row; Up next excludes tasks already chosen for Today.
+Export a JSON backup from Settings before opening the updated app. If anything looks wrong, Import backup restores that file. Import backup still replaces the whole workspace. It is separate from the project merge importer below.
 
-## Verification
-Automated checks cover selection limits, duplicate prevention, ordering around completed tasks, completion, removal, local-day rollover, carryover, deleted tasks, backup round-trip, preserved orders/settings/history, and HTML escaping. Browser checks cover new-task selection, suggestions/search, reordering, removal, completion, refresh persistence and a 390px phone viewport. Native iOS installation behavior has not been device-tested.
+## On the iPhone
+1. Settings → Export backup, and keep that file.
+2. Force-quit Task Forge (swipe it away), then open it from the Home Screen.
+3. The header should read **v5.5**. If it still looks like the previous version, force-quit and open it once more so the new service worker (`task-forge-v5.5`) can take over.
+4. Confirm today's tasks are still there. The backup is only needed if you want to roll back.
 
-## Existing features
-Gmail triage, Orders & Deliveries, routines, projects, categories, Trash, backups and Gmail session behavior are retained. Shipping status remains inferred from email rather than live carrier scans.
+## Project notes
+Open a project. **Reference** is free text for specs, part numbers, and other standing info. **Log** is a list of dated entries you can add, edit, and delete. Both are stored on the project and travel with backup export and import. Task notes are unchanged and stay on each task.
 
-## Data and privacy
-The public deployment ships an empty starter backup only. Personal task/email/order data and daily choices remain in the browser’s existing localStorage. No personal backup or OAuth access token is included in source. The service-worker asset cache is versioned 5.4.1; the data storage key is unchanged.
+## Merge import
+Settings, the Projects page, or a project’s Import button accepts a JSON file in the schema below. Pick an existing project or create the project named in the file. The preview lists tasks that will be added, titles that already exist in that project (skipped, case-insensitive), and notes that will be attached. Re-importing skips a note when the date, title, and body already match. Nothing already in Task Forge is deleted or overwritten.
 
-## v5.4.2 — Optional task checklists
-- Open or create a task and choose Add checklist. Add, rename, remove, and check off items, then save. Enter adds the next item. Cancel discards checklist edits.
-- Task cards and Today's Focus show completed/total item counts. Completing all items does not automatically complete the parent task.
-- Notes remain available for details. Existing storage keys and app URL are unchanged; checklists travel with backup/restore and Trash recovery.
+Imported tasks use source `import`. Completed tasks are stored as completed. Open ones stay open and are marked reviewed, so a large import does not fill the review queue. Priorities map to `low`, `normal`, `high`, or `urgent` (`medium` becomes normal, `critical` becomes urgent, anything else becomes normal). If the file’s category is not already in the app, the preview offers to create it.
+
+```json
+{
+  "format": "task-forge-import",
+  "version": 1,
+  "project": { "name": "RAM 1500", "category": "Vehicles", "description": "optional" },
+  "tasks": [
+    {
+      "title": "Rotate tires",
+      "notes": "optional",
+      "priority": "low|normal|high|urgent (optional)",
+      "dueDate": "YYYY-MM-DD or null",
+      "checklist": [{ "text": "Torque lugs", "done": false }],
+      "completed": false
+    }
+  ],
+  "notes": [
+    { "date": "YYYY-MM-DD or null", "title": "optional", "body": "plain text" }
+  ]
+}
+```
+
+## Gmail auto-check
+When Settings → Auto-check Gmail is on (the default) and this browser already has a Gmail session, Task Forge runs the email-proposal scan and the orders scan when the app opens, when it becomes visible again, and every 15 minutes while it is open. It does not open the Google sign-in popup on its own. Check Gmail and Scan Orders still work manually. Proposals that are already tracked are not added again. The home screen and the Email page show “Last checked X min ago”.
+
+## Also in this version
+- Today’s Focus uses a progress ring. Projects use a small ring. Task rows pick up a thin category-color edge. The big numerals use a small subset of Barlow Condensed (SIL Open Font License, see `fonts/OFL.txt`).
+- Checking off a task plays a short animation and, where the phone allows it, a light vibration. Finishing the last focus task plays a small celebration. Both respect Reduce Motion.
+- The 180 and 512 icons are in the service worker cache.
+
+## Check
+From the repo root:
+
+```sh
+node task-forge-v5-4/test/v55.test.js
+```
+
+That covers v5.3/v5.2 migration being saved immediately, merge dedupe for tasks and notes, a 100-task / 40-note import, and a backup round-trip that keeps project notes.
