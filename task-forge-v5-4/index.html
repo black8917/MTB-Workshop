@@ -11,14 +11,14 @@
 <link rel="manifest" href="manifest.webmanifest" />
 <link rel="apple-touch-icon" href="icons/icon-180.png" />
 <link rel="icon" href="icons/icon-192.png" />
-<link rel="stylesheet" href="styles.css?v=5.4.2" />
-<title>Task Forge v5.4.2</title>
+<link rel="stylesheet" href="styles.css?v=5.5" />
+<title>Task Forge v5.5</title>
 </head>
 <body>
 <div id="app">
   <header class="app-header">
     <div class="brand" id="brand-home"><span class="logo">TF<span class="logo-notch">/</span></span><span><b>TASK FORGE</b><small>PERSONAL COMMAND CENTER</small></span></div>
-    <div class="header-actions"><span id="header-clock" class="header-clock"></span><button id="new-task-btn" class="btn btn-accent btn-new" type="button"><span class="plus">+</span> New task</button></div>
+    <div class="header-actions"><span class="version-tag">v5.5</span><span id="header-clock" class="header-clock"></span><button id="new-task-btn" class="btn btn-accent btn-new" type="button"><span class="plus">+</span> New task</button></div>
   </header>
   <main id="main" aria-live="polite"></main>
   <nav id="bottom-nav" class="bottom-nav" aria-label="Main navigation">
@@ -32,6 +32,7 @@
   </nav>
 </div>
 <div id="modal-root"></div><div id="toast-root"></div><input type="file" id="file-input" accept=".json,application/json" hidden />
-<script src="app.js?v=5.4.2" defer></script>
+<script src="logic.js?v=5.5" defer></script>
+<script src="app.js?v=5.5" defer></script>
 </body>
 </html>

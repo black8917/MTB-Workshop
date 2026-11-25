@@ -1,0 +1,47 @@
+{
+  "format": "task-forge-import",
+  "version": 1,
+  "project": {
+    "name": "RAM 1500",
+    "category": "Vehicles",
+    "description": "5.7 Hemi. Example import only — not real maintenance data."
+  },
+  "tasks": [
+    {
+      "title": "Rotate tires",
+      "notes": "Torque lug nuts to spec.",
+      "priority": "normal",
+      "dueDate": null,
+      "checklist": [
+        { "text": "Front axle", "done": false },
+        { "text": "Rear axle", "done": false }
+      ],
+      "completed": false
+    },
+    {
+      "title": "Check tire wear",
+      "priority": "high",
+      "dueDate": "2026-11-16",
+      "completed": false
+    },
+    {
+      "title": "Replace cabin filter",
+      "notes": "Filter 53034051AA",
+      "priority": "low",
+      "dueDate": null,
+      "completed": true
+    }
+  ],
+  "notes": [
+    {
+      "date": "2026-08-02",
+      "title": "Oil change",
+      "body": "5W-20 full synthetic. Filter 53034051AA. 86,420 mi."
+    },
+    {
+      "date": null,
+      "title": "Tire size",
+      "body": "275/60R20"
+    }
+  ]
+}

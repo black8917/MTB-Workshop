@@ -1,27 +1,51 @@
-# Task Forge v5.4.1 — Today’s Focus
+# Task Forge v5.5
 
-Updated in place at `/MTB-Workshop/task-forge-v5-4/` so installed shortcuts and the existing `task-forge-v5.4-state` data remain in use.
+Personal command center. This update ships in place at `/MTB-Workshop/task-forge-v5-4/` so the iPhone Home Screen icon keeps working. The storage key stays `task-forge-v5.4-state`. The service worker cache is `task-forge-v5.5`.
+
+Export a JSON backup from Settings before opening the updated app. If anything looks wrong, import that backup. It replaces the dashboard. The new project import does not.
+
+## Project notes
+
+Open a project and choose Notes. Reference notes are free text (part numbers, specs, history). Log entries are dated notes you can add, edit, and delete. Both are stored on the project and travel with backup export and full restore. They are separate from task notes.
+
+## Project import
+
+Settings → Import tasks & notes, or Import on a project. Pick a JSON file in the schema below. The preview shows new tasks, duplicate titles that will be skipped, and notes that will be attached. Choose an existing project or create the project named in the file. If that category does not exist yet, the preview asks before creating it. Nothing already on the device is deleted or overwritten.
+
+Duplicates are titles in the destination project, compared without regard to case. Notes skip a repeat of the same date, title, and body. Imported tasks are marked source `import`. Completed tasks go straight to completed. Re-importing the same file adds nothing new.
+
+Full backup restore is unchanged and still replaces the current dashboard. A backup file is refused by the project importer.
+
+Example file: `data/sample-import.json`.
+
+### Import schema (version 1)
+
+```json
+{
+  "format": "task-forge-import",
+  "version": 1,
+  "project": { "name": "RAM 1500", "category": "Vehicles", "description": "optional" },
+  "tasks": [ { "title": "...", "notes": "optional", "priority": "low|normal|high|urgent (optional)", "dueDate": "YYYY-MM-DD or null", "checklist": [ { "text": "...", "done": false } ], "completed": false } ],
+  "notes": [ { "date": "YYYY-MM-DD or null", "title": "optional", "body": "plain text" } ]
+}
+```
+
+Priorities other than `low`, `normal`, `high`, and `urgent` are stored as `normal`.
+
+## Gmail auto-check
+
+When a Gmail session is already signed in, Task Forge runs the email-proposal scan and the orders scan on open, when the app becomes visible, and every 15 minutes while it stays open. It does not open the Google sign-in prompt by itself. Check Gmail and Scan Orders remain. Settings has a toggle, on by default. Home shows “Last checked X min ago” when Gmail is configured.
+
+The Gmail token lasts about an hour. After it expires, automatic checks pause until you tap Check Gmail or Scan Orders again.
 
 ## Today’s Focus
-- Home opens with a user-selected daily list. Start with three tasks; at most five including completed selections.
-- Choose tasks offers suggestions by deadline/priority and search across all open tasks. Nothing is automatically selected.
-- Do today is available on task rows and in the new/edit task form. It never changes a task’s due date or creates a duplicate.
-- Edit list exposes touch-friendly move up/down and remove controls. Removing only changes the daily selection.
-- Completing a task updates its existing record. Completed selections collapse and remain in the progress denominator; the list does not refill automatically.
-- At the next local calendar day, unfinished selections become a review queue. Keep today or Later; Later leaves the task in All tasks.
-- The daily selection and pending carryover are included in JSON backup export/restore. Older backups load with an empty selection.
-- Dashboard totals now fit into one compact row; Up next excludes tasks already chosen for Today.
 
-## Verification
-Automated checks cover selection limits, duplicate prevention, ordering around completed tasks, completion, removal, local-day rollover, carryover, deleted tasks, backup round-trip, preserved orders/settings/history, and HTML escaping. Browser checks cover new-task selection, suggestions/search, reordering, removal, completion, refresh persistence and a 390px phone viewport. Native iOS installation behavior has not been device-tested.
-
-## Existing features
-Gmail triage, Orders & Deliveries, routines, projects, categories, Trash, backups and Gmail session behavior are retained. Shipping status remains inferred from email rather than live carrier scans.
+Home still opens on a daily list you choose. Up to five tasks. Completing one checks it off in place. At 100% the focus ring turns green. Unfinished selections roll into a review queue on the next local day. Orders, routines, review, and backups behave as before.
 
 ## Data and privacy
-The public deployment ships an empty starter backup only. Personal task/email/order data and daily choices remain in the browser’s existing localStorage. No personal backup or OAuth access token is included in source. The service-worker asset cache is versioned 5.4.1; the data storage key is unchanged.
 
-## v5.4.2 — Optional task checklists
-- Open or create a task and choose Add checklist. Add, rename, remove, and check off items, then save. Enter adds the next item. Cancel discards checklist edits.
-- Task cards and Today's Focus show completed/total item counts. Completing all items does not automatically complete the parent task.
-- Notes remain available for details. Existing storage keys and app URL are unchanged; checklists travel with backup/restore and Trash recovery.
+The public copy ships an empty starter backup. Personal tasks, notes, email, and orders stay in this browser’s localStorage. No OAuth token is written into a backup. v5.3 and v5 state is copied into `task-forge-v5.4-state` and saved immediately the first time v5.5 opens if that key is empty.
+
+## Checks
+
+`node test/v55.test.js` covers migration persistence, import merge and dedupe (including about 100 tasks and 40 notes), backup round-trip of notes, and escaping of note and import text.
